@@ -19,6 +19,7 @@ export async function getAccounts(supabase: SupabaseClient, userId: string): Pro
     name: String(row.name),
     type: row.type as Account["type"],
     openingBalance: String(row.opening_balance),
+    openingBalanceDate: row.opening_balance_date ? String(row.opening_balance_date) : undefined,
     cachedBalance: String(row.cached_balance),
     cachedAt: row.cached_at ? String(row.cached_at) : null
   }));

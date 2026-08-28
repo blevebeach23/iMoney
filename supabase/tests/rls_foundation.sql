@@ -58,7 +58,10 @@ insert into public.profiles(id, username, full_name)
 values
   ('00000000-0000-0000-0000-0000000000a1', 'user-a', 'User A'),
   ('00000000-0000-0000-0000-0000000000b1', 'user-b', 'User B'),
-  ('00000000-0000-0000-0000-0000000000c1', 'user-c', 'User C');
+  ('00000000-0000-0000-0000-0000000000c1', 'user-c', 'User C')
+on conflict (id) do update
+  set username = excluded.username,
+      full_name = excluded.full_name;
 
 insert into public.households(id, name, created_by)
 values

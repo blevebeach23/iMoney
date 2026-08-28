@@ -1,0 +1,37 @@
+"use client";
+
+import Link from "next/link";
+import { useFormState } from "react-dom";
+import { registerAction } from "@/lib/auth/actions";
+import { AuthField, FormMessage, SubmitButton } from "./form-controls";
+import type { FormState } from "@/lib/auth/validation";
+
+const initialState: FormState = { ok: false };
+
+export function RegisterForm() {
+  const [state, formAction] = useFormState(registerAction, initialState);
+
+  return (
+    <form action={formAction} className="space-y-4">
+      <FormMessage state={state} />
+      <AuthField label="Nome" name="fullName" autoComplete="name" errors={state.fieldErrors} />
+      <AuthField label="Username" name="username" autoComplete="username" errors={state.fieldErrors} />
+      <AuthField label="Email" name="email" type="email" autoComplete="email" errors={state.fieldErrors} />
+      <AuthField label="Password" name="password" type="password" autoComplete="new-password" errors={state.fieldErrors} />
+      <AuthField
+        label="Conferma password"
+        name="confirmPassword"
+        type="password"
+        autoComplete="new-password"
+        errors={state.fieldErrors}
+      />
+      <SubmitButton>Crea account</SubmitButton>
+      <p className="text-center text-sm text-zinc-600">
+        Hai già un account?{" "}
+        <Link className="font-semibold text-primary" href="/login">
+          Accedi
+        </Link>
+      </p>
+    </form>
+  );
+}

@@ -25,6 +25,7 @@ export interface Account {
   name: string;
   type: AccountType;
   openingBalance: MoneyAmount;
+  openingBalanceDate?: string;
   cachedBalance: MoneyAmount;
   cachedAt: string | null;
 }

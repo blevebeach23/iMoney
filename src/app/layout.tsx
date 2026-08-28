@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import { BottomNav } from "@/components/layout/bottom-nav";
+import { AppChrome } from "@/components/layout/app-chrome";
 
 export const metadata: Metadata = {
   title: "iMoney",
@@ -19,8 +19,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="it">
       <body>
-        {children}
-        <BottomNav />
+        <AppChrome>{children}</AppChrome>
       </body>
     </html>
   );
