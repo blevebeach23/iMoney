@@ -2,14 +2,17 @@ export type MoneyAmount = string;
 
 export type MovementType = "income" | "expense" | "reimbursement";
 
-export type AccountType = "cash" | "bank" | "credit_card";
+export type AccountType = "cash" | "bank" | "credit_card" | "other";
 
 export type FundType = "savings" | "holiday" | "emergency" | "deposit" | "custom";
 
 export interface MacroCategory {
   id: string;
+  ownerUserId: string | null;
+  householdId: string | null;
   name: string;
   sortOrder: number;
+  deletedAt: string | null;
 }
 
 export interface Category {
@@ -17,6 +20,7 @@ export interface Category {
   macroCategoryId: string;
   name: string;
   sortOrder: number;
+  deletedAt: string | null;
 }
 
 export interface Account {
@@ -28,6 +32,7 @@ export interface Account {
   openingBalanceDate?: string;
   cachedBalance: MoneyAmount;
   cachedAt: string | null;
+  deletedAt: string | null;
 }
 
 export interface Fund {
@@ -36,8 +41,12 @@ export interface Fund {
   name: string;
   type: FundType;
   openingBalance: MoneyAmount;
+  openingBalanceDate: string;
   cachedBalance: MoneyAmount;
   cachedAt: string | null;
+  targetAmount: MoneyAmount | null;
+  targetDate: string | null;
+  deletedAt: string | null;
 }
 
 export interface Movement {

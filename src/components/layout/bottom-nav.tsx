@@ -1,11 +1,12 @@
 import { BarChart3, Home, MoreHorizontal, Plus, Users } from "lucide-react";
+import Link from "next/link";
 
 const items = [
-  { label: "Home", icon: Home },
-  { label: "Family", icon: Users },
-  { label: "Add", icon: Plus },
-  { label: "Statistics", icon: BarChart3 },
-  { label: "More", icon: MoreHorizontal }
+  { label: "Home", href: "/", icon: Home },
+  { label: "Family", href: "/", icon: Users },
+  { label: "Add", href: "/", icon: Plus },
+  { label: "Statistics", href: "/", icon: BarChart3 },
+  { label: "More", href: "/settings", icon: MoreHorizontal }
 ];
 
 export function BottomNav() {
@@ -15,10 +16,10 @@ export function BottomNav() {
         {items.map((item) => {
           const Icon = item.icon;
           return (
-            <button key={item.label} className="flex min-h-16 flex-col items-center justify-center gap-1 text-xs font-medium text-zinc-600">
+            <Link key={item.label} href={item.href} className="flex min-h-16 flex-col items-center justify-center gap-1 text-xs font-medium text-zinc-600">
               <Icon aria-hidden className="h-5 w-5" />
               <span>{item.label}</span>
-            </button>
+            </Link>
           );
         })}
       </div>

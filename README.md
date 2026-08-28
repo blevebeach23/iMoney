@@ -48,6 +48,17 @@ Route implementate nella fase 2:
 
 Le route applicative private usano sessione Supabase server-side e middleware di refresh sessione. L'email resta gestita da Supabase Auth e viene visualizzata dal profilo utente senza duplicarla nelle tabelle applicative.
 
+## Anagrafiche finanziarie
+
+Route implementate nella fase 3:
+
+- `/accounts`: elenco, creazione, modifica e disattivazione dei conti personali.
+- `/funds`: elenco, creazione, modifica e disattivazione dei fondi personali con target opzionale.
+- `/settings/categories`: gestione gerarchica di macro-categorie personali e categorie figlie.
+- `/settings`: accesso alle anagrafiche e al profilo dalla voce More.
+
+Le anagrafiche usano soft delete dove serve mantenere compatibilita con dati storici. I saldi visualizzati sono `cached_balance` quando presente, altrimenti il saldo iniziale; la ricostruzione completa da movimenti resta fuori dalla fase 3.
+
 ## Fondazione inclusa
 
 - Scaffold Next.js App Router con TypeScript e Tailwind.
@@ -60,3 +71,4 @@ Le route applicative private usano sessione Supabase server-side e middleware di
 - Dashboard mobile-first con navigazione concettuale: Home, Family, Add, Statistics, More.
 - Supabase Auth reale con client browser, client server e middleware.
 - Onboarding iniziale con stato `profiles.onboarding_completed`.
+- Gestione anagrafiche finanziarie personali per conti, fondi e categorie.
