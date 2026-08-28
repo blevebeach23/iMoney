@@ -35,7 +35,7 @@ function mapMovementRow(row: Record<string, unknown>): Movement {
     amount: String(row.amount),
     occurredOn: String(row.occurred_on),
     description: String(row.description ?? ""),
-    isSharedWithHousehold: Boolean(row.is_shared_with_household),
+    isSharedWithHousehold: Boolean(row.shared_with_family),
     reimbursementForMovementId: row.reimbursement_for_movement_id ? String(row.reimbursement_for_movement_id) : null,
     importBatchId: row.import_batch_id ? String(row.import_batch_id) : null,
     deletedAt: row.deleted_at ? String(row.deleted_at) : null
