@@ -1,0 +1,17 @@
+.next
+node_modules
+.pnpm-store
+.env
+.env.local
+.env.*.local
+coverage
+dist
+*.tsbuildinfo
+*.log
+tmp
+temp
+.DS_Store
+.vercel
+supabase/.branches
+supabase/.temp
+supabase/.env
