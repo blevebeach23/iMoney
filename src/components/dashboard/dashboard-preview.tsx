@@ -17,10 +17,13 @@ const sampleMovements: Movement[] = [
     amount: "2450.00",
     occurredOn: "2026-08-01",
     description: "Stipendio",
+    notes: "",
     isSharedWithHousehold: false,
     reimbursementForMovementId: null,
     importBatchId: null,
-    deletedAt: null
+    deletedAt: null,
+    createdBy: null,
+    updatedBy: null
   },
   {
     id: "2",
@@ -33,10 +36,13 @@ const sampleMovements: Movement[] = [
     amount: "410.00",
     occurredOn: "2026-08-15",
     description: "Spesa e casa",
+    notes: "",
     isSharedWithHousehold: true,
     reimbursementForMovementId: null,
     importBatchId: null,
-    deletedAt: null
+    deletedAt: null,
+    createdBy: null,
+    updatedBy: null
   },
   {
     id: "3",
@@ -49,10 +55,13 @@ const sampleMovements: Movement[] = [
     amount: "500.00",
     occurredOn: "2026-08-20",
     description: "Asilo",
+    notes: "",
     isSharedWithHousehold: true,
     reimbursementForMovementId: null,
     importBatchId: null,
-    deletedAt: null
+    deletedAt: null,
+    createdBy: null,
+    updatedBy: null
   },
   {
     id: "4",
@@ -65,10 +74,13 @@ const sampleMovements: Movement[] = [
     amount: "300.00",
     occurredOn: "2026-08-28",
     description: "Rimborso regione",
+    notes: "",
     isSharedWithHousehold: true,
     reimbursementForMovementId: "3",
     importBatchId: null,
-    deletedAt: null
+    deletedAt: null,
+    createdBy: null,
+    updatedBy: null
   }
 ];
 

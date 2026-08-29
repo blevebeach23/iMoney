@@ -15,10 +15,13 @@ function movement(partial: Pick<Movement, "type" | "amount"> & Partial<Movement>
     amount: partial.amount,
     occurredOn: partial.occurredOn ?? "2026-08-15",
     description: partial.description ?? "Movement",
+    notes: partial.notes ?? "",
     isSharedWithHousehold: partial.isSharedWithHousehold ?? false,
     reimbursementForMovementId: partial.reimbursementForMovementId ?? null,
     importBatchId: partial.importBatchId ?? null,
-    deletedAt: partial.deletedAt ?? null
+    deletedAt: partial.deletedAt ?? null,
+    createdBy: partial.createdBy ?? null,
+    updatedBy: partial.updatedBy ?? null
   };
 }
 

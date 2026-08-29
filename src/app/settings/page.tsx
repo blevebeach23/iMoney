@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BadgeEuro, FolderTree, Landmark, UserRound, WalletCards } from "lucide-react";
+import { BadgeEuro, FolderTree, Landmark, ListChecks, UserRound, WalletCards } from "lucide-react";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 const items = [
+  { href: "/movements", label: "Movimenti", icon: ListChecks },
   { href: "/accounts", label: "Conti", icon: Landmark },
   { href: "/funds", label: "Fondi", icon: BadgeEuro },
   { href: "/settings/categories", label: "Categorie", icon: FolderTree },

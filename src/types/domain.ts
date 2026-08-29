@@ -60,10 +60,13 @@ export interface Movement {
   amount: MoneyAmount;
   occurredOn: string;
   description: string;
+  notes: string;
   isSharedWithHousehold: boolean;
   reimbursementForMovementId: string | null;
   importBatchId: string | null;
   deletedAt: string | null;
+  createdBy: string | null;
+  updatedBy: string | null;
 }
 
 export interface Transfer {
