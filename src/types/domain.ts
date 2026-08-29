@@ -83,6 +83,20 @@ export interface Transfer {
   deletedAt: string | null;
 }
 
+export type BudgetOwnerType = "USER" | "HOUSEHOLD";
+
+export interface Budget {
+  id: string;
+  ownerType: BudgetOwnerType;
+  ownerUserId: string | null;
+  householdId: string | null;
+  month: string;
+  macroCategoryId: string | null;
+  categoryId: string | null;
+  amount: MoneyAmount;
+  deletedAt: string | null;
+}
+
 export interface MonthlySummary {
   income: MoneyAmount;
   grossExpenses: MoneyAmount;

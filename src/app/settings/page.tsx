@@ -7,6 +7,7 @@ export const dynamic = "force-dynamic";
 
 const items = [
   { href: "/movements", label: "Movimenti", icon: ListChecks },
+  { href: "/budgets", label: "Budget", icon: WalletCards },
   { href: "/accounts", label: "Conti", icon: Landmark },
   { href: "/funds", label: "Fondi", icon: BadgeEuro },
   { href: "/settings/categories", label: "Categorie", icon: FolderTree },

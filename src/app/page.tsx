@@ -2,12 +2,14 @@ import { DashboardPreview } from "@/components/dashboard/dashboard-preview";
 import { logoutAction } from "@/lib/auth/actions";
 import { calculateAnnualTrend } from "@/lib/calculations/annual-trend";
 import { calculateFinancialBalances } from "@/lib/calculations/balances";
+import { calculateBudgetReport } from "@/lib/calculations/budget";
 import { calculateCategoryAggregates } from "@/lib/calculations/category-aggregates";
 import { formatMonthLabel, formatYearMonth, monthRangeFromYearMonth } from "@/lib/calculations/dates";
 import { calculateMonthlySummary } from "@/lib/calculations/monthly-summary";
 import { getUpcomingMovements } from "@/lib/calculations/upcoming";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAccounts } from "@/services/accounts/account-service";
+import { getPersonalBudgetsForMonth } from "@/services/budgets/budget-service";
 import { getFunds } from "@/services/funds/fund-service";
 import { getMovementCategoryInfo, getMonthlyMovements, getMovementsBetween, getMovementsUntil } from "@/services/movements/movement-service";
 import { getTransfersUntil } from "@/services/transfers/transfer-service";
@@ -41,8 +43,9 @@ export default async function Home({ searchParams }: Readonly<{ searchParams: Re
 
   const range = monthRangeFromYearMonth(firstParam(searchParams.month) ?? formatYearMonth(new Date()));
   const year = Number(range.yearMonth.slice(0, 4));
-  const [accounts, funds, monthMovements, movementsUntilMonthEnd, yearMovements, transfersUntilMonthEnd, categoryInfo] = await Promise.all([
+  const [accounts, budgets, funds, monthMovements, movementsUntilMonthEnd, yearMovements, transfersUntilMonthEnd, categoryInfo] = await Promise.all([
     getAccounts(supabase, user.id),
+    getPersonalBudgetsForMonth(supabase, user.id, range.monthStart),
     getFunds(supabase, user.id),
     getMonthlyMovements(supabase, user.id, range.monthStart, range.monthEnd),
     getMovementsUntil(supabase, user.id, range.monthEnd),
@@ -52,6 +55,7 @@ export default async function Home({ searchParams }: Readonly<{ searchParams: Re
   ]);
   const summary = calculateMonthlySummary(monthMovements);
   const balances = calculateFinancialBalances(accounts, funds, movementsUntilMonthEnd, transfersUntilMonthEnd, range.today, range.monthEnd);
+  const budgetReport = calculateBudgetReport(budgets, monthMovements, categoryInfo);
   const categoryAggregates = calculateCategoryAggregates(monthMovements, categoryInfo);
   const upcomingMovements = getUpcomingMovements(monthMovements, range.today);
   const annualTrend = calculateAnnualTrend(yearMovements, year);
@@ -66,6 +70,7 @@ export default async function Home({ searchParams }: Readonly<{ searchParams: Re
       <DashboardPreview
         annualTrend={annualTrend}
         balances={balances}
+        budgetReport={budgetReport}
         macroCategoryAggregates={categoryAggregates.macroCategories}
         monthLabel={formatMonthLabel(range.monthStart)}
         selectedMonth={range.yearMonth}

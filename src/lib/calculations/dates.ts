@@ -33,6 +33,11 @@ export function formatMonthLabel(monthStart: string): string {
   return new Intl.DateTimeFormat("it-IT", { month: "long", year: "numeric" }).format(new Date(`${monthStart}T00:00:00`));
 }
 
+export function previousMonthStart(monthStart: string): string {
+  const date = new Date(`${monthStart}T00:00:00`);
+  return formatDate(new Date(date.getFullYear(), date.getMonth() - 1, 1));
+}
+
 export function formatYearMonth(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");

@@ -1,10 +1,12 @@
 import { CalendarDays, CreditCard, Landmark, Plus, Wallet, WalletCards, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import type { AnnualTrendPoint } from "@/lib/calculations/annual-trend";
+import type { BudgetReport } from "@/lib/calculations/budget";
 import type { MacroCategoryAggregate } from "@/lib/calculations/category-aggregates";
 import type { FinancialBalances } from "@/lib/calculations/balances";
 import { calculateMonthlySummary } from "@/lib/calculations/monthly-summary";
 import type { MonthlySummary, Movement } from "@/types/domain";
+import { BudgetProgress } from "@/components/budgets/budget-progress";
 import { StatTile } from "./stat-tile";
 
 const sampleMovements: Movement[] = [
@@ -89,6 +91,7 @@ const sampleMovements: Movement[] = [
 interface DashboardPreviewProps {
   annualTrend?: AnnualTrendPoint[];
   balances?: FinancialBalances;
+  budgetReport?: BudgetReport;
   macroCategoryAggregates?: MacroCategoryAggregate[];
   monthLabel?: string;
   selectedMonth?: string;
@@ -107,6 +110,7 @@ function movementSign(type: Movement["type"]) {
 export function DashboardPreview({
   annualTrend = [],
   balances,
+  budgetReport,
   macroCategoryAggregates = [],
   monthLabel = "Agosto 2026",
   selectedMonth = "2026-08",
@@ -152,6 +156,33 @@ export function DashboardPreview({
         <StatTile label="Spese nette" value={`EUR ${monthlySummary.netExpenses}`} />
         <StatTile label="Bilancio" value={`EUR ${monthlySummary.economicBalance}`} tone="good" />
       </section>
+
+      <Link href={`/budgets/${selectedMonth.replace("-", "/")}`} className="mt-6 block rounded-md border border-border bg-white p-4 shadow-panel">
+        {budgetReport?.general ? (
+          <>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">Budget del mese</h2>
+                <p className="mt-1 text-sm text-zinc-600">
+                  EUR {budgetReport.general.usage.used} / EUR {budgetReport.general.usage.budgetAmount}
+                </p>
+              </div>
+              <span className="text-sm font-semibold text-primary">{Math.round(budgetReport.general.usage.usedPercentage)}%</span>
+            </div>
+            <div className="mt-4">
+              <BudgetProgress usage={budgetReport.general.usage} />
+            </div>
+          </>
+        ) : (
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Budget del mese</h2>
+              <p className="mt-1 text-sm text-zinc-600">Budget totale non impostato</p>
+            </div>
+            <span className="text-sm font-semibold text-primary">Apri</span>
+          </div>
+        )}
+      </Link>
 
       <section className="mt-6 space-y-3">
         <h2 className="text-lg font-semibold text-foreground">Saldi finanziari</h2>
