@@ -5,6 +5,7 @@ import {
   calculateFinancialBalances,
   calculateFundBalance
 } from "@/lib/calculations/balances";
+import { calculateMonthlySummary } from "@/lib/calculations/monthly-summary";
 import type { Account, Fund, Movement, Transfer } from "@/types/domain";
 
 function account(partial: Partial<Account> = {}): Account {
@@ -147,7 +148,19 @@ describe("financial balances", () => {
   });
 
   it("excludes transfers from economic totals but includes them in balances", () => {
+    const summaryBeforeTransfer = calculateMonthlySummary([
+      movement({ type: "income", amount: "1000.00" }),
+      movement({ type: "expense", amount: "250.00" })
+    ]);
+
     expect(calculateAccountBalance(account(), [], [transfer()], "2026-08-29")).toBe("950.00");
+    expect(summaryBeforeTransfer).toMatchObject({
+      income: "1000.00",
+      grossExpenses: "250.00",
+      reimbursements: "0.00",
+      netExpenses: "250.00",
+      economicBalance: "750.00"
+    });
   });
 
   it("includes future movements in month-end forecast", () => {
@@ -162,5 +175,58 @@ describe("financial balances", () => {
 
     expect(balances.bank[0]?.balance).toBe("1000.00");
     expect(balances.forecastMonthEnd[0]?.balance).toBe("900.00");
+  });
+
+  it("applies account to account transfers only to source and destination balances", () => {
+    const source = account({ id: "bank-1", openingBalance: "1000.00" });
+    const destination = account({ id: "bank-2", name: "Savings bank", openingBalance: "400.00" });
+    const accountTransfer = transfer({
+      fromAccountId: "bank-1",
+      toAccountId: "bank-2",
+      toFundId: null,
+      amount: "125.00"
+    });
+
+    expect(calculateAccountBalance(source, [], [accountTransfer], "2026-08-29")).toBe("875.00");
+    expect(calculateAccountBalance(destination, [], [accountTransfer], "2026-08-29")).toBe("525.00");
+  });
+
+  it("applies account to fund transfers to both containers", () => {
+    const bank = account();
+    const holidayFund = fund();
+    const accountToFund = transfer({ amount: "150.00" });
+
+    expect(calculateAccountBalance(bank, [], [accountToFund], "2026-08-29")).toBe("850.00");
+    expect(calculateFundBalance(holidayFund, [], [accountToFund], "2026-08-29")).toBe("350.00");
+  });
+
+  it("applies fund to account transfers to both containers", () => {
+    const bank = account();
+    const holidayFund = fund();
+    const fundToAccount = transfer({
+      fromAccountId: null,
+      fromFundId: "fund-1",
+      toAccountId: "bank-1",
+      toFundId: null,
+      amount: "75.00"
+    });
+
+    expect(calculateFundBalance(holidayFund, [], [fundToAccount], "2026-08-29")).toBe("125.00");
+    expect(calculateAccountBalance(bank, [], [fundToAccount], "2026-08-29")).toBe("1075.00");
+  });
+
+  it("includes dated transfers in month-end forecast", () => {
+    const balances = calculateFinancialBalances(
+      [account()],
+      [fund()],
+      [],
+      [transfer({ amount: "300.00", occurredOn: "2026-09-25" })],
+      "2026-09-10",
+      "2026-09-30"
+    );
+
+    expect(balances.bank[0]?.balance).toBe("1000.00");
+    expect(balances.funds[0]?.balance).toBe("200.00");
+    expect(balances.forecastMonthEnd[0]?.balance).toBe("700.00");
   });
 });

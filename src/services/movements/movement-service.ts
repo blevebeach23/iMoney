@@ -100,6 +100,28 @@ export async function getMonthlyMovements(
   return (data ?? []).map(mapMovementRow);
 }
 
+export async function getMovementsBetween(
+  supabase: SupabaseClient,
+  userId: string,
+  startDate: string,
+  endDate: string
+): Promise<Movement[]> {
+  const { data, error } = await supabase
+    .from("movements")
+    .select("*")
+    .eq("owner_user_id", userId)
+    .is("deleted_at", null)
+    .gte("occurred_on", startDate)
+    .lte("occurred_on", endDate)
+    .order("occurred_on", { ascending: true });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).map(mapMovementRow);
+}
+
 export async function getMovementsUntil(supabase: SupabaseClient, userId: string, cutoffDate: string): Promise<Movement[]> {
   const { data, error } = await supabase
     .from("movements")

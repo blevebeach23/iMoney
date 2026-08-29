@@ -1,19 +1,25 @@
 import { DashboardPreview } from "@/components/dashboard/dashboard-preview";
 import { logoutAction } from "@/lib/auth/actions";
+import { calculateAnnualTrend } from "@/lib/calculations/annual-trend";
 import { calculateFinancialBalances } from "@/lib/calculations/balances";
 import { calculateCategoryAggregates } from "@/lib/calculations/category-aggregates";
-import { currentMonthRange } from "@/lib/calculations/dates";
+import { formatMonthLabel, formatYearMonth, monthRangeFromYearMonth } from "@/lib/calculations/dates";
 import { calculateMonthlySummary } from "@/lib/calculations/monthly-summary";
+import { getUpcomingMovements } from "@/lib/calculations/upcoming";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAccounts } from "@/services/accounts/account-service";
 import { getFunds } from "@/services/funds/fund-service";
-import { getMovementCategoryInfo, getMonthlyMovements, getMovementsUntil } from "@/services/movements/movement-service";
+import { getMovementCategoryInfo, getMonthlyMovements, getMovementsBetween, getMovementsUntil } from "@/services/movements/movement-service";
 import { getTransfersUntil } from "@/services/transfers/transfer-service";
 import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-export default async function Home() {
+function firstParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+export default async function Home({ searchParams }: Readonly<{ searchParams: Record<string, string | string[] | undefined> }>) {
   const supabase = createServerSupabaseClient();
   const {
     data: { user }
@@ -33,18 +39,22 @@ export default async function Home() {
     redirect("/onboarding");
   }
 
-  const range = currentMonthRange();
-  const [accounts, funds, monthMovements, movementsUntilMonthEnd, transfersUntilMonthEnd, categoryInfo] = await Promise.all([
+  const range = monthRangeFromYearMonth(firstParam(searchParams.month) ?? formatYearMonth(new Date()));
+  const year = Number(range.yearMonth.slice(0, 4));
+  const [accounts, funds, monthMovements, movementsUntilMonthEnd, yearMovements, transfersUntilMonthEnd, categoryInfo] = await Promise.all([
     getAccounts(supabase, user.id),
     getFunds(supabase, user.id),
     getMonthlyMovements(supabase, user.id, range.monthStart, range.monthEnd),
     getMovementsUntil(supabase, user.id, range.monthEnd),
+    getMovementsBetween(supabase, user.id, `${year}-01-01`, `${year}-12-31`),
     getTransfersUntil(supabase, user.id, range.monthEnd),
     getMovementCategoryInfo(supabase, user.id)
   ]);
   const summary = calculateMonthlySummary(monthMovements);
   const balances = calculateFinancialBalances(accounts, funds, movementsUntilMonthEnd, transfersUntilMonthEnd, range.today, range.monthEnd);
   const categoryAggregates = calculateCategoryAggregates(monthMovements, categoryInfo);
+  const upcomingMovements = getUpcomingMovements(monthMovements, range.today);
+  const annualTrend = calculateAnnualTrend(yearMovements, year);
 
   return (
     <>
@@ -54,10 +64,13 @@ export default async function Home() {
         </button>
       </form>
       <DashboardPreview
+        annualTrend={annualTrend}
         balances={balances}
         macroCategoryAggregates={categoryAggregates.macroCategories}
-        monthLabel={new Intl.DateTimeFormat("it-IT", { month: "long", year: "numeric" }).format(new Date(`${range.monthStart}T00:00:00`))}
+        monthLabel={formatMonthLabel(range.monthStart)}
+        selectedMonth={range.yearMonth}
         summary={summary}
+        upcomingMovements={upcomingMovements}
       />
     </>
   );

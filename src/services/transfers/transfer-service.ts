@@ -1,7 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { TransferFormInput } from "@/lib/transfers/validation";
 import type { Transfer } from "@/types/domain";
 
 type TransferRow = Record<string, unknown>;
+
+export interface TransferListItem extends Transfer {
+  fromName: string;
+  toName: string;
+}
 
 export async function getTransfersUntil(supabase: SupabaseClient, userId: string, cutoffDate: string): Promise<Transfer[]> {
   const { data, error } = await supabase
@@ -19,6 +25,98 @@ export async function getTransfersUntil(supabase: SupabaseClient, userId: string
   return (data ?? []).map(mapTransferRow);
 }
 
+export async function getTransfers(supabase: SupabaseClient, userId: string): Promise<TransferListItem[]> {
+  const { data, error } = await supabase
+    .from("transfers")
+    .select("*, from_account:accounts!transfers_from_account_id_fkey(name), to_account:accounts!transfers_to_account_id_fkey(name), from_fund:funds!transfers_from_fund_id_fkey(name), to_fund:funds!transfers_to_fund_id_fkey(name)")
+    .eq("owner_user_id", userId)
+    .is("deleted_at", null)
+    .order("occurred_on", { ascending: false });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).map(mapTransferListRow);
+}
+
+export async function getTransferById(supabase: SupabaseClient, userId: string, transferId: string): Promise<TransferListItem | null> {
+  const { data, error } = await supabase
+    .from("transfers")
+    .select("*, from_account:accounts!transfers_from_account_id_fkey(name), to_account:accounts!transfers_to_account_id_fkey(name), from_fund:funds!transfers_from_fund_id_fkey(name), to_fund:funds!transfers_to_fund_id_fkey(name)")
+    .eq("id", transferId)
+    .eq("owner_user_id", userId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data ? mapTransferListRow(data) : null;
+}
+
+export async function createTransfer(supabase: SupabaseClient, userId: string, input: TransferFormInput) {
+  const { error } = await supabase.from("transfers").insert(toTransferPayload(userId, input));
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function updateTransfer(supabase: SupabaseClient, userId: string, input: TransferFormInput & { id: string }) {
+  const { error } = await supabase
+    .from("transfers")
+    .update(toTransferPayload(userId, input))
+    .eq("id", input.id)
+    .eq("owner_user_id", userId)
+    .is("deleted_at", null);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function softDeleteTransfer(supabase: SupabaseClient, userId: string, transferId: string) {
+  const { error } = await supabase
+    .from("transfers")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", transferId)
+    .eq("owner_user_id", userId)
+    .is("deleted_at", null);
+
+  if (error) {
+    throw error;
+  }
+}
+
+function toTransferPayload(userId: string, input: TransferFormInput) {
+  return {
+    owner_user_id: userId,
+    household_id: null,
+    from_account_id: input.fromAccountId,
+    to_account_id: input.toAccountId,
+    from_fund_id: input.fromFundId,
+    to_fund_id: input.toFundId,
+    amount: input.amount,
+    occurred_on: input.occurredOn,
+    description: input.description
+  };
+}
+
+function mapTransferListRow(row: TransferRow): TransferListItem {
+  const fromAccount = asRecord(row.from_account);
+  const toAccount = asRecord(row.to_account);
+  const fromFund = asRecord(row.from_fund);
+  const toFund = asRecord(row.to_fund);
+
+  return {
+    ...mapTransferRow(row),
+    fromName: String(fromAccount?.name ?? fromFund?.name ?? "Origine"),
+    toName: String(toAccount?.name ?? toFund?.name ?? "Destinazione")
+  };
+}
+
 function mapTransferRow(row: TransferRow): Transfer {
   return {
     id: String(row.id),
@@ -33,4 +131,12 @@ function mapTransferRow(row: TransferRow): Transfer {
     description: String(row.description ?? ""),
     deletedAt: row.deleted_at ? String(row.deleted_at) : null
   };
+}
+
+function asRecord(value: unknown): TransferRow | null {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as TransferRow;
+  }
+
+  return null;
 }

@@ -4,7 +4,7 @@ import Link from "next/link";
 const items = [
   { label: "Home", href: "/", icon: Home },
   { label: "Family", href: "/", icon: Users },
-  { label: "Add", href: "/movements/new", icon: Plus },
+  { label: "Add", href: "/add", icon: Plus },
   { label: "Statistics", href: "/", icon: BarChart3 },
   { label: "More", href: "/settings", icon: MoreHorizontal }
 ];
