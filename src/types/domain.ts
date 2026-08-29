@@ -8,6 +8,7 @@ export type FundType = "savings" | "holiday" | "emergency" | "deposit" | "custom
 export type HouseholdRole = "owner" | "admin" | "member";
 export type HouseholdMemberStatus = "INVITED" | "ACTIVE" | "REMOVED";
 export type HouseholdInviteStatus = "PENDING" | "ACCEPTED" | "REJECTED" | "EXPIRED";
+export type FixedExpenseFrequency = "monthly" | "quarterly" | "yearly" | "custom";
 
 export interface MacroCategory {
   id: string;
@@ -67,9 +68,28 @@ export interface Movement {
   isSharedWithHousehold: boolean;
   reimbursementForMovementId: string | null;
   importBatchId: string | null;
+  fixedExpenseId?: string | null;
   deletedAt: string | null;
   createdBy: string | null;
   updatedBy: string | null;
+}
+
+export interface FixedExpense {
+  id: string;
+  ownerUserId: string;
+  householdId: string | null;
+  accountId: string | null;
+  fundId: string | null;
+  categoryId: string;
+  amount: MoneyAmount;
+  description: string;
+  frequency: FixedExpenseFrequency;
+  startsOn: string;
+  endsOn: string | null;
+  dayOfMonth: number;
+  activeMonths: number[];
+  isSharedWithHousehold: boolean;
+  deletedAt: string | null;
 }
 
 export interface Transfer {
@@ -98,6 +118,14 @@ export interface Budget {
   categoryId: string | null;
   amount: MoneyAmount;
   deletedAt: string | null;
+}
+
+export interface ImportBatch {
+  id: string;
+  ownerUserId: string;
+  sourceFilename: string;
+  importedRows: number;
+  createdAt: string;
 }
 
 export interface Household {

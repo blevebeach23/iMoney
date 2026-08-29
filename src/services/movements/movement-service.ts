@@ -363,6 +363,7 @@ function mapMovementRow(row: MovementRow): Movement {
     isSharedWithHousehold: Boolean(row.shared_with_family),
     reimbursementForMovementId: row.reimbursement_for_movement_id ? String(row.reimbursement_for_movement_id) : null,
     importBatchId: row.import_batch_id ? String(row.import_batch_id) : null,
+    fixedExpenseId: row.fixed_expense_id ? String(row.fixed_expense_id) : null,
     deletedAt: row.deleted_at ? String(row.deleted_at) : null,
     createdBy: row.created_by ? String(row.created_by) : null,
     updatedBy: row.updated_by ? String(row.updated_by) : null
