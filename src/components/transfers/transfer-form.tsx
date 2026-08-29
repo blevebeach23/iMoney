@@ -7,6 +7,7 @@ import { FormMessage, PendingButton, SelectField, TextField } from "@/components
 import type { FormState } from "@/lib/auth/validation";
 import { saveTransferAction } from "@/lib/transfers/actions";
 import type { Account, Fund } from "@/types/domain";
+import type { TransferListItem } from "@/services/transfers/transfer-service";
 
 const initialState: FormState = { ok: false };
 
@@ -17,10 +18,12 @@ function containerOptions(accounts: Account[], funds: Fund[]) {
   ];
 }
 
-export function TransferForm({ accounts, funds }: Readonly<{ accounts: Account[]; funds: Fund[] }>) {
+export function TransferForm({ accounts, funds, transfer }: Readonly<{ accounts: Account[]; funds: Fund[]; transfer?: TransferListItem }>) {
   const [state, action] = useFormState(saveTransferAction, initialState);
   const today = new Date().toISOString().slice(0, 10);
   const containers = containerOptions(accounts, funds);
+  const fromValue = transfer?.fromAccountId ? `account:${transfer.fromAccountId}` : transfer?.fromFundId ? `fund:${transfer.fromFundId}` : containers[0]?.value;
+  const toValue = transfer?.toAccountId ? `account:${transfer.toAccountId}` : transfer?.toFundId ? `fund:${transfer.toFundId}` : containers[1]?.value;
 
   if (containers.length < 2) {
     return (
@@ -45,11 +48,12 @@ export function TransferForm({ accounts, funds }: Readonly<{ accounts: Account[]
   return (
     <form action={action} className="space-y-4">
       <FormMessage state={state} />
-      <TextField label="Data" name="occurredOn" type="date" defaultValue={today} errors={state.fieldErrors} />
-      <SelectField label="Origine" name="fromContainerId" defaultValue={containers[0]?.value} options={containers} errors={state.fieldErrors} />
-      <SelectField label="Destinazione" name="toContainerId" defaultValue={containers[1]?.value} options={containers} errors={state.fieldErrors} />
-      <TextField label="Importo" name="amount" inputMode="decimal" errors={state.fieldErrors} />
-      <TextField label="Descrizione" name="description" placeholder="Opzionale" errors={state.fieldErrors} />
+      {transfer?.id && <input type="hidden" name="id" value={transfer.id} />}
+      <TextField label="Data" name="occurredOn" type="date" defaultValue={transfer?.occurredOn ?? today} errors={state.fieldErrors} />
+      <SelectField label="Origine" name="fromContainerId" defaultValue={fromValue} options={containers} errors={state.fieldErrors} />
+      <SelectField label="Destinazione" name="toContainerId" defaultValue={toValue} options={containers} errors={state.fieldErrors} />
+      <TextField label="Importo" name="amount" defaultValue={transfer?.amount ?? ""} inputMode="decimal" errors={state.fieldErrors} />
+      <TextField label="Descrizione" name="description" defaultValue={transfer?.description ?? ""} placeholder="Opzionale" errors={state.fieldErrors} />
       <PendingButton>
         <Save aria-hidden className="h-4 w-4" />
         Salva trasferimento

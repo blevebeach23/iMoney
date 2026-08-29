@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Plus } from "lucide-react";
-import { MovementFiltersForm, MovementList } from "@/components/movements/movement-list";
+import { MovementFiltersForm, MovementTimeline } from "@/components/movements/movement-list";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAccounts } from "@/services/accounts/account-service";
 import { getCategoryTree } from "@/services/categories/category-service";
 import { getFunds } from "@/services/funds/fund-service";
 import { getMovements, type MovementFilters } from "@/services/movements/movement-service";
+import { buildMovementTimeline, transfersCanBeShownWithMovementFilters } from "@/services/timeline/timeline-service";
+import { getTransfers } from "@/services/transfers/transfer-service";
 
 export const dynamic = "force-dynamic";
 
@@ -34,12 +36,15 @@ export default async function MovementsPage({ searchParams }: Readonly<{ searchP
     shared: (firstParam(searchParams.shared) as MovementFilters["shared"]) || "all"
   };
 
-  const [accounts, funds, categoryTree, movements] = await Promise.all([
+  const showTransfers = transfersCanBeShownWithMovementFilters(filters);
+  const [accounts, funds, categoryTree, movements, transfers] = await Promise.all([
     getAccounts(supabase, user.id),
     getFunds(supabase, user.id),
     getCategoryTree(supabase, user.id),
-    getMovements(supabase, user.id, filters)
+    getMovements(supabase, user.id, filters),
+    showTransfers ? getTransfers(supabase, user.id, { period: filters.period, containerId: filters.containerId }) : Promise.resolve([])
   ]);
+  const timeline = buildMovementTimeline(movements, transfers);
 
   return (
     <main className="mx-auto min-h-dvh max-w-md px-4 pb-24 pt-6">
@@ -48,14 +53,14 @@ export default async function MovementsPage({ searchParams }: Readonly<{ searchP
           <p className="text-sm font-semibold text-primary">Movimenti</p>
           <h1 className="mt-2 text-3xl font-bold tracking-normal text-foreground">Personali</h1>
         </div>
-        <Link href="/movements/new" className="inline-flex min-h-11 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-white">
+        <Link href="/add" className="inline-flex min-h-11 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-white">
           <Plus aria-hidden className="h-4 w-4" />
           Nuovo
         </Link>
       </header>
       <div className="space-y-4">
         <MovementFiltersForm accounts={accounts} categoryTree={categoryTree} filters={filters} funds={funds} />
-        <MovementList movements={movements} />
+        <MovementTimeline items={timeline} />
       </div>
     </main>
   );

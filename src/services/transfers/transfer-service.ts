@@ -9,6 +9,11 @@ export interface TransferListItem extends Transfer {
   toName: string;
 }
 
+export interface TransferFilters {
+  period?: string;
+  containerId?: string;
+}
+
 export async function getTransfersUntil(supabase: SupabaseClient, userId: string, cutoffDate: string): Promise<Transfer[]> {
   const { data, error } = await supabase
     .from("transfers")
@@ -25,13 +30,32 @@ export async function getTransfersUntil(supabase: SupabaseClient, userId: string
   return (data ?? []).map(mapTransferRow);
 }
 
-export async function getTransfers(supabase: SupabaseClient, userId: string): Promise<TransferListItem[]> {
-  const { data, error } = await supabase
+export async function getTransfers(supabase: SupabaseClient, userId: string, filters: TransferFilters = {}): Promise<TransferListItem[]> {
+  let query = supabase
     .from("transfers")
     .select("*, from_account:accounts!transfers_from_account_id_fkey(name), to_account:accounts!transfers_to_account_id_fkey(name), from_fund:funds!transfers_from_fund_id_fkey(name), to_fund:funds!transfers_to_fund_id_fkey(name)")
     .eq("owner_user_id", userId)
     .is("deleted_at", null)
     .order("occurred_on", { ascending: false });
+
+  if (filters.period) {
+    const [year, month] = filters.period.split("-");
+    if (year && month) {
+      query = query.gte("occurred_on", `${year}-${month}-01`).lte("occurred_on", new Date(Number(year), Number(month), 0).toISOString().slice(0, 10));
+    }
+  }
+
+  if (filters.containerId?.startsWith("account:")) {
+    const accountId = filters.containerId.slice("account:".length);
+    query = query.or(`from_account_id.eq.${accountId},to_account_id.eq.${accountId}`);
+  }
+
+  if (filters.containerId?.startsWith("fund:")) {
+    const fundId = filters.containerId.slice("fund:".length);
+    query = query.or(`from_fund_id.eq.${fundId},to_fund_id.eq.${fundId}`);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw error;
@@ -57,11 +81,13 @@ export async function getTransferById(supabase: SupabaseClient, userId: string, 
 }
 
 export async function createTransfer(supabase: SupabaseClient, userId: string, input: TransferFormInput) {
-  const { error } = await supabase.from("transfers").insert(toTransferPayload(userId, input));
+  const { data, error } = await supabase.from("transfers").insert(toTransferPayload(userId, input)).select("id").single();
 
   if (error) {
     throw error;
   }
+
+  return String(data.id);
 }
 
 export async function updateTransfer(supabase: SupabaseClient, userId: string, input: TransferFormInput & { id: string }) {
