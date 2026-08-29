@@ -6,7 +6,15 @@ import { BudgetProgress } from "@/components/budgets/budget-progress";
 import { FormMessage, PendingButton, SelectField, TextField } from "@/components/master-data/field-controls";
 import { Button } from "@/components/ui/button";
 import type { FormState } from "@/lib/auth/validation";
-import { copyPreviousMonthBudgetsAction, deactivateBudgetAction, saveBudgetAction, saveBudgetFormAction } from "@/lib/budgets/actions";
+import {
+  copyPreviousMonthBudgetsAction,
+  deactivateBudgetAction,
+  deactivateHouseholdBudgetAction,
+  saveBudgetAction,
+  saveBudgetFormAction,
+  saveHouseholdBudgetAction,
+  saveHouseholdBudgetFormAction
+} from "@/lib/budgets/actions";
 import type { BudgetReport, BudgetUsage } from "@/lib/calculations/budget";
 import type { CategoryTreeItem } from "@/services/categories/category-service";
 import type { BudgetListItem } from "@/services/budgets/budget-service";
@@ -27,15 +35,17 @@ export function BudgetManager({
   categoryTree,
   monthStart,
   previousMonthStart,
-  report
+  report,
+  householdId
 }: Readonly<{
   budgets: BudgetListItem[];
   categoryTree: CategoryTreeItem[];
   monthStart: string;
   previousMonthStart: string;
   report: BudgetReport;
+  householdId?: string;
 }>) {
-  const [state, action] = useFormState(saveBudgetAction, initialState);
+  const [state, action] = useFormState(householdId ? saveHouseholdBudgetAction : saveBudgetAction, initialState);
   const macroOptions = categoryTree.map((macro) => ({ value: macro.id, label: macro.name }));
   const categories = categoryOptions(categoryTree);
 
@@ -43,7 +53,7 @@ export function BudgetManager({
     <div className="space-y-6">
       <FormMessage state={state} />
       {report.general ? (
-        <BudgetCard budget={budgets.find((item) => item.id === report.general?.budget.id)} label={report.general.label} monthStart={monthStart} usage={report.general.usage} />
+        <BudgetCard budget={budgets.find((item) => item.id === report.general?.budget.id)} householdId={householdId} label={report.general.label} monthStart={monthStart} usage={report.general.usage} />
       ) : (
         <EmptyBudgetCard title="Budget totale non impostato" />
       )}
@@ -54,7 +64,7 @@ export function BudgetManager({
           <EmptyBudgetCard title="Nessun budget per macro-categoria" />
         ) : (
           report.macroCategories.map((item) => (
-            <BudgetCard key={item.budget.id} budget={budgets.find((budget) => budget.id === item.budget.id)} label={item.label} monthStart={monthStart} usage={item.usage} />
+            <BudgetCard key={item.budget.id} budget={budgets.find((budget) => budget.id === item.budget.id)} householdId={householdId} label={item.label} monthStart={monthStart} usage={item.usage} />
           ))
         )}
       </section>
@@ -65,7 +75,7 @@ export function BudgetManager({
           <EmptyBudgetCard title="Nessun budget per categoria" />
         ) : (
           report.categories.map((item) => (
-            <BudgetCard key={item.budget.id} budget={budgets.find((budget) => budget.id === item.budget.id)} label={item.label} monthStart={monthStart} usage={item.usage} />
+            <BudgetCard key={item.budget.id} budget={budgets.find((budget) => budget.id === item.budget.id)} householdId={householdId} label={item.label} monthStart={monthStart} usage={item.usage} />
           ))
         )}
       </section>
@@ -74,6 +84,7 @@ export function BudgetManager({
         <h2 className="text-lg font-semibold text-foreground">Crea o modifica budget</h2>
         <form action={action} className="space-y-4">
           <input type="hidden" name="month" value={monthStart} />
+          {householdId && <input type="hidden" name="householdId" value={householdId} />}
           <SelectField
             label="Ambito"
             name="scopeKind"
@@ -95,19 +106,24 @@ export function BudgetManager({
         </form>
       </section>
 
-      <form action={copyPreviousMonthBudgetsAction}>
-        <input type="hidden" name="previousMonth" value={previousMonthStart} />
-        <input type="hidden" name="targetMonth" value={monthStart} />
-        <Button type="submit" variant="secondary" className="w-full">
-          <Copy aria-hidden className="h-4 w-4" />
-          Copia budget dal mese precedente
-        </Button>
-      </form>
+      {!householdId && (
+        <form action={copyPreviousMonthBudgetsAction}>
+          <input type="hidden" name="previousMonth" value={previousMonthStart} />
+          <input type="hidden" name="targetMonth" value={monthStart} />
+          <Button type="submit" variant="secondary" className="w-full">
+            <Copy aria-hidden className="h-4 w-4" />
+            Copia budget dal mese precedente
+          </Button>
+        </form>
+      )}
     </div>
   );
 }
 
-function BudgetCard({ budget, label, monthStart, usage }: Readonly<{ budget?: BudgetListItem; label: string; monthStart: string; usage: BudgetUsage }>) {
+function BudgetCard({ budget, householdId, label, monthStart, usage }: Readonly<{ budget?: BudgetListItem; householdId?: string; label: string; monthStart: string; usage: BudgetUsage }>) {
+  const updateAction = householdId ? saveHouseholdBudgetFormAction : saveBudgetFormAction;
+  const deleteAction = householdId ? deactivateHouseholdBudgetAction : deactivateBudgetAction;
+
   return (
     <article className="space-y-4 rounded-md border border-border bg-white p-4 shadow-panel">
       <div className="flex items-start justify-between gap-3">
@@ -122,9 +138,10 @@ function BudgetCard({ budget, label, monthStart, usage }: Readonly<{ budget?: Bu
       <BudgetProgress usage={usage} />
       {budget && (
         <div className="space-y-3">
-          <form action={saveBudgetFormAction} className="flex gap-2">
+          <form action={updateAction} className="flex gap-2">
             <input type="hidden" name="id" value={budget.id} />
             <input type="hidden" name="month" value={monthStart} />
+            {householdId && <input type="hidden" name="householdId" value={householdId} />}
             <input type="hidden" name="scopeKind" value={budget.categoryId ? "category" : budget.macroCategoryId ? "macro" : "general"} />
             <input type="hidden" name="macroCategoryId" value={budget.macroCategoryId ?? ""} />
             <input type="hidden" name="categoryId" value={budget.categoryId ?? ""} />
@@ -133,9 +150,10 @@ function BudgetCard({ budget, label, monthStart, usage }: Readonly<{ budget?: Bu
               <Save aria-hidden className="h-4 w-4" />
             </Button>
           </form>
-          <form action={deactivateBudgetAction}>
+          <form action={deleteAction}>
             <input type="hidden" name="id" value={budget.id} />
             <input type="hidden" name="month" value={monthStart} />
+            {householdId && <input type="hidden" name="householdId" value={householdId} />}
             <Button type="submit" variant="ghost" className="w-full text-red-700">
               <Trash2 aria-hidden className="h-4 w-4" />
               Disattiva

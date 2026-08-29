@@ -26,12 +26,65 @@ export async function getPersonalBudgetsForMonth(supabase: SupabaseClient, userI
   return (data ?? []).map(mapBudgetListRow);
 }
 
+export async function getHouseholdBudgetsForMonth(supabase: SupabaseClient, householdId: string, monthStart: string): Promise<BudgetListItem[]> {
+  const { data, error } = await supabase
+    .from("budgets")
+    .select("*, macro_categories(name), categories(name)")
+    .eq("owner_type", "HOUSEHOLD")
+    .eq("household_id", householdId)
+    .eq("month", monthStart)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).map(mapBudgetListRow);
+}
+
 export async function getPreviousPersonalBudgets(supabase: SupabaseClient, userId: string, previousMonthStart: string): Promise<BudgetListItem[]> {
   return getPersonalBudgetsForMonth(supabase, userId, previousMonthStart);
 }
 
 export async function createBudget(supabase: SupabaseClient, userId: string, input: BudgetFormInput) {
   const { error } = await supabase.from("budgets").insert(toBudgetPayload(userId, input));
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function createHouseholdBudget(supabase: SupabaseClient, householdId: string, input: BudgetFormInput) {
+  const { error } = await supabase.from("budgets").insert(toHouseholdBudgetPayload(householdId, input));
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function updateHouseholdBudget(supabase: SupabaseClient, householdId: string, input: BudgetFormInput & { id: string }) {
+  const { error } = await supabase
+    .from("budgets")
+    .update(toHouseholdBudgetPayload(householdId, input))
+    .eq("id", input.id)
+    .eq("owner_type", "HOUSEHOLD")
+    .eq("household_id", householdId)
+    .is("deleted_at", null);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function deactivateHouseholdBudget(supabase: SupabaseClient, householdId: string, budgetId: string) {
+  const { error } = await supabase
+    .from("budgets")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", budgetId)
+    .eq("owner_type", "HOUSEHOLD")
+    .eq("household_id", householdId)
+    .is("deleted_at", null);
 
   if (error) {
     throw error;
@@ -112,6 +165,18 @@ function toBudgetPayload(userId: string, input: BudgetFormInput) {
     owner_type: "USER",
     owner_user_id: userId,
     household_id: null,
+    month: input.month,
+    macro_category_id: input.scopeKind === "macro" ? input.macroCategoryId : null,
+    category_id: input.scopeKind === "category" ? input.categoryId : null,
+    amount: input.amount
+  };
+}
+
+function toHouseholdBudgetPayload(householdId: string, input: BudgetFormInput) {
+  return {
+    owner_type: "HOUSEHOLD",
+    owner_user_id: null,
+    household_id: householdId,
     month: input.month,
     macro_category_id: input.scopeKind === "macro" ? input.macroCategoryId : null,
     category_id: input.scopeKind === "category" ? input.categoryId : null,

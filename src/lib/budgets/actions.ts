@@ -5,7 +5,15 @@ import { redirect } from "next/navigation";
 import { toFieldErrors, type FormState } from "@/lib/auth/validation";
 import { budgetFormSchema } from "@/lib/budgets/validation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { copyMissingPersonalBudgets, createBudget, deactivateBudget, updateBudget } from "@/services/budgets/budget-service";
+import {
+  copyMissingPersonalBudgets,
+  createBudget,
+  createHouseholdBudget,
+  deactivateBudget,
+  deactivateHouseholdBudget,
+  updateBudget,
+  updateHouseholdBudget
+} from "@/services/budgets/budget-service";
 
 async function requireUser() {
   const supabase = createServerSupabaseClient();
@@ -69,12 +77,51 @@ export async function saveBudgetFormAction(formData: FormData) {
   }
 }
 
+export async function saveHouseholdBudgetAction(_prevState: FormState, formData: FormData): Promise<FormState> {
+  const householdId = String(formData.get("householdId") ?? "");
+  const parsed = budgetFormSchema.safeParse(formDataToBudgetObject(formData));
+
+  if (!parsed.success) {
+    return { ok: false, fieldErrors: toFieldErrors(parsed.error) };
+  }
+
+  try {
+    const { supabase } = await requireUser();
+    if (parsed.data.id) {
+      await updateHouseholdBudget(supabase, householdId, { ...parsed.data, id: parsed.data.id });
+    } else {
+      await createHouseholdBudget(supabase, householdId, parsed.data);
+    }
+  } catch (error) {
+    return { ok: false, message: messageFromError(error) };
+  }
+
+  revalidateHouseholdBudgetPaths(householdId, parsed.data.month);
+  return { ok: true, message: "Budget famiglia salvato" };
+}
+
+export async function saveHouseholdBudgetFormAction(formData: FormData) {
+  const result = await saveHouseholdBudgetAction({ ok: false }, formData);
+  if (!result.ok) {
+    throw new Error(result.message ?? "Budget famiglia non valido");
+  }
+}
+
 export async function deactivateBudgetAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const month = String(formData.get("month") ?? "");
   const { supabase, user } = await requireUser();
   await deactivateBudget(supabase, user.id, id);
   revalidateBudgetPaths(month);
+}
+
+export async function deactivateHouseholdBudgetAction(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const month = String(formData.get("month") ?? "");
+  const householdId = String(formData.get("householdId") ?? "");
+  const { supabase } = await requireUser();
+  await deactivateHouseholdBudget(supabase, householdId, id);
+  revalidateHouseholdBudgetPaths(householdId, month);
 }
 
 export async function copyPreviousMonthBudgetsAction(formData: FormData) {
@@ -91,5 +138,13 @@ function revalidateBudgetPaths(monthStart: string) {
   if (/^\d{4}-\d{2}-01$/.test(monthStart)) {
     const [year, month] = monthStart.split("-");
     revalidatePath(`/budgets/${year}/${month}`);
+  }
+}
+
+function revalidateHouseholdBudgetPaths(householdId: string, monthStart: string) {
+  revalidatePath("/family");
+  revalidatePath("/family/settings");
+  if (/^\d{4}-\d{2}-01$/.test(monthStart)) {
+    revalidatePath(`/family?householdId=${householdId}`);
   }
 }

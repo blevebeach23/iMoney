@@ -5,6 +5,9 @@ export type MovementType = "income" | "expense" | "reimbursement";
 export type AccountType = "cash" | "bank" | "credit_card" | "other";
 
 export type FundType = "savings" | "holiday" | "emergency" | "deposit" | "custom";
+export type HouseholdRole = "owner" | "admin" | "member";
+export type HouseholdMemberStatus = "INVITED" | "ACTIVE" | "REMOVED";
+export type HouseholdInviteStatus = "PENDING" | "ACCEPTED" | "REJECTED" | "EXPIRED";
 
 export interface MacroCategory {
   id: string;
@@ -95,6 +98,34 @@ export interface Budget {
   categoryId: string | null;
   amount: MoneyAmount;
   deletedAt: string | null;
+}
+
+export interface Household {
+  id: string;
+  name: string;
+  createdBy: string;
+}
+
+export interface HouseholdMember {
+  householdId: string;
+  userId: string;
+  role: HouseholdRole;
+  status: HouseholdMemberStatus;
+  invitedBy: string | null;
+  joinedAt: string | null;
+  removedAt: string | null;
+}
+
+export interface HouseholdInvite {
+  id: string;
+  householdId: string;
+  invitedBy: string;
+  email: string;
+  phone: string | null;
+  token: string;
+  status: HouseholdInviteStatus;
+  expiresAt: string;
+  acceptedBy: string | null;
 }
 
 export interface MonthlySummary {

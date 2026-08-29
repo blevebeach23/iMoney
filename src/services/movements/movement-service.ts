@@ -17,6 +17,7 @@ export interface MovementFilters {
 
 export interface MovementListItem extends Movement {
   accountName: string | null;
+  authorName?: string;
   categoryName: string;
   fundName: string | null;
   macroCategoryName: string;
@@ -110,6 +111,57 @@ export async function getMovementsBetween(
     .from("movements")
     .select("*")
     .eq("owner_user_id", userId)
+    .is("deleted_at", null)
+    .gte("occurred_on", startDate)
+    .lte("occurred_on", endDate)
+    .order("occurred_on", { ascending: true });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).map(mapMovementRow);
+}
+
+export async function getSharedHouseholdMovements(
+  supabase: SupabaseClient,
+  householdId: string,
+  monthStart?: string,
+  monthEnd?: string
+): Promise<MovementListItem[]> {
+  let query = supabase
+    .from("movements")
+    .select("*, categories(name, macro_categories(id, name)), accounts(name), funds(name), profiles!movements_owner_user_id_fkey(full_name)")
+    .eq("household_id", householdId)
+    .eq("shared_with_family", true)
+    .is("deleted_at", null)
+    .order("occurred_on", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (monthStart && monthEnd) {
+    query = query.gte("occurred_on", monthStart).lte("occurred_on", monthEnd);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).map(mapMovementListRow).map(stripRawCategory);
+}
+
+export async function getSharedHouseholdMovementsBetween(
+  supabase: SupabaseClient,
+  householdId: string,
+  startDate: string,
+  endDate: string
+): Promise<Movement[]> {
+  const { data, error } = await supabase
+    .from("movements")
+    .select("*")
+    .eq("household_id", householdId)
+    .eq("shared_with_family", true)
     .is("deleted_at", null)
     .gte("occurred_on", startDate)
     .lte("occurred_on", endDate)
@@ -277,10 +329,12 @@ function mapMovementListRow(row: MovementRow): MovementListItem & { rawCategory?
   const macro = asRecord(category?.macro_categories);
   const account = asRecord(row.accounts);
   const fund = asRecord(row.funds);
+  const profile = asRecord(row.profiles);
 
   return {
     ...mapMovementRow(row),
     accountName: account?.name ? String(account.name) : null,
+    authorName: profile?.full_name ? String(profile.full_name) : undefined,
     categoryName: String(category?.name ?? "Senza categoria"),
     fundName: fund?.name ? String(fund.name) : null,
     macroCategoryName: String(macro?.name ?? ""),
