@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BadgeEuro, CalendarClock, FileUp, FolderTree, Landmark, ListChecks, UserRound, WalletCards } from "lucide-react";
+import { Archive, BadgeEuro, CalendarClock, FileUp, FolderTree, Landmark, ListChecks, UserRound, WalletCards } from "lucide-react";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +9,7 @@ const items = [
   { href: "/movements", label: "Movimenti", icon: ListChecks },
   { href: "/fixed-expenses", label: "Spese fisse", icon: CalendarClock },
   { href: "/import", label: "Import CSV", icon: FileUp },
+  { href: "/archive", label: "Archivio anni", icon: Archive },
   { href: "/budgets", label: "Budget", icon: WalletCards },
   { href: "/accounts", label: "Conti", icon: Landmark },
   { href: "/funds", label: "Fondi", icon: BadgeEuro },
