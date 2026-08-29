@@ -18,6 +18,26 @@ PWA Next.js/TypeScript per rendiconto personale e familiare, con Supabase Auth e
 - `pnpm lint`: lint Next.js.
 - `pnpm build`: build di produzione Next.js.
 
+## PWA e iPhone
+
+iMoney e configurata come PWA installabile:
+
+- manifest in `public/manifest.webmanifest`;
+- icone placeholder in `public/icons/`;
+- display `standalone`;
+- orientamento portrait;
+- safe-area support per iPhone;
+- service worker V1 online-first in `public/sw.js`.
+
+La V1 richiede connessione per leggere e scrivere dati Supabase. Il service worker serve solo asset statici/fallback offline e non trasforma i dati finanziari in una fonte locale.
+
+Installazione iPhone:
+
+1. Aprire l'URL di produzione in Safari.
+2. Toccare Condividi.
+3. Toccare Aggiungi alla schermata Home.
+4. Aprire iMoney dalla nuova icona.
+
 ## Supabase locale
 
 Prerequisito: Docker Desktop avviato.
@@ -33,6 +53,55 @@ Se `supabase db query` non supporta file SQL multi-statement nella versione inst
 docker cp supabase\tests\rls_foundation.sql supabase_db_iMoney:/tmp/rls_foundation.sql
 docker exec supabase_db_iMoney psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f /tmp/rls_foundation.sql
 ```
+
+## Preparazione Supabase Cloud
+
+Checklist manuale prima del deploy:
+
+1. Creare un progetto Supabase Cloud.
+2. Recuperare Project URL e anon/publishable key.
+3. Non usare mai la service role key nel frontend o in variabili `NEXT_PUBLIC_*`.
+4. Applicare le migration con Supabase CLI collegata al progetto cloud, dopo backup/controllo ambiente:
+
+```powershell
+pnpm supabase login
+pnpm supabase link --project-ref YOUR_PROJECT_REF
+pnpm supabase db push
+```
+
+5. In Supabase Auth configurare Site URL con l'URL Vercel di produzione.
+6. In Supabase Auth aggiungere Redirect URLs:
+   - `https://your-domain.example/auth/confirm`
+   - `https://your-domain.example/auth/reset-password`
+   - eventuale preview Vercel solo se usata per test.
+7. Verificare che RLS resti abilitata sulle tabelle applicative.
+
+## Deploy Vercel
+
+Configurazione prevista:
+
+- package manager: `pnpm`;
+- install command: `pnpm install --frozen-lockfile`;
+- build command: `pnpm build`;
+- config: `vercel.json`.
+
+Variabili ambiente Vercel:
+
+```text
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-or-publishable-key
+NEXT_PUBLIC_SITE_URL=https://your-vercel-app.vercel.app
+```
+
+Procedura:
+
+1. Collegare il repository a Vercel.
+2. Impostare le variabili ambiente di produzione.
+3. Eseguire il primo deploy.
+4. Copiare l'URL di produzione.
+5. Aggiornare `NEXT_PUBLIC_SITE_URL` se si usa un dominio custom.
+6. Aggiornare Site URL e Redirect URLs in Supabase Auth.
+7. Verificare login, conferma email, reset password e installazione iPhone da Safari.
 
 ## Auth e onboarding
 
