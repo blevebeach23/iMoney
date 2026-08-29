@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { calculateAccountBalance, calculateCreditCardDue } from "@/lib/calculations/balances";
 import type { Account } from "@/types/domain";
+import type { Movement, Transfer } from "@/types/domain";
 import type { z } from "zod";
 import type { accountFormSchema } from "@/lib/master-data/validation";
 
@@ -65,6 +67,14 @@ export async function deactivateAccount(supabase: SupabaseClient, userId: string
   if (error) {
     throw error;
   }
+}
+
+export function getRebuiltAccountBalance(account: Account, movements: Movement[], transfers: Transfer[], cutoffDate: string): string {
+  if (account.type === "credit_card") {
+    return calculateCreditCardDue(account, movements, transfers, cutoffDate);
+  }
+
+  return calculateAccountBalance(account, movements, transfers, cutoffDate);
 }
 
 function mapAccountRow(row: Record<string, unknown>): Account {

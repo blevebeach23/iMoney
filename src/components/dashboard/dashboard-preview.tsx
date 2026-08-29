@@ -1,8 +1,9 @@
 import { CreditCard, Landmark, Plus, WalletCards } from "lucide-react";
-import { calculateBudgetUsage } from "@/lib/calculations/budget";
+import Link from "next/link";
+import type { MacroCategoryAggregate } from "@/lib/calculations/category-aggregates";
+import type { FinancialBalances } from "@/lib/calculations/balances";
 import { calculateMonthlySummary } from "@/lib/calculations/monthly-summary";
-import type { Movement } from "@/types/domain";
-import { Button } from "@/components/ui/button";
+import type { MonthlySummary, Movement } from "@/types/domain";
 import { StatTile } from "./stat-tile";
 
 const sampleMovements: Movement[] = [
@@ -84,53 +85,51 @@ const sampleMovements: Movement[] = [
   }
 ];
 
-export function DashboardPreview() {
-  const summary = calculateMonthlySummary(sampleMovements);
-  const budget = calculateBudgetUsage("1800.00", sampleMovements);
+interface DashboardPreviewProps {
+  balances?: FinancialBalances;
+  macroCategoryAggregates?: MacroCategoryAggregate[];
+  monthLabel?: string;
+  summary?: MonthlySummary;
+}
+
+export function DashboardPreview({ balances, macroCategoryAggregates = [], monthLabel = "Agosto 2026", summary }: DashboardPreviewProps) {
+  const monthlySummary = summary ?? calculateMonthlySummary(sampleMovements);
+  const accountRows = balances
+    ? [
+        ...balances.cash.map((item) => ({ name: item.name, value: `EUR ${item.balance}`, icon: Landmark })),
+        ...balances.bank.map((item) => ({ name: item.name, value: `EUR ${item.balance}`, icon: Landmark })),
+        ...balances.funds.map((item) => ({ name: item.name, value: `EUR ${item.balance}`, icon: WalletCards })),
+        ...balances.creditCardsDue.map((item) => ({ name: `${item.name} da addebitare`, value: `EUR ${item.due}`, icon: CreditCard })),
+        ...balances.forecastMonthEnd.map((item) => ({ name: `${item.name} fine mese`, value: `EUR ${item.balance}`, icon: WalletCards }))
+      ]
+    : [
+        { name: "Conto corrente", value: "EUR 2850.00", icon: Landmark },
+        { name: "Carta credito", value: "EUR -410.00", icon: CreditCard },
+        { name: "Fondo vacanze", value: "EUR 1200.00", icon: WalletCards }
+      ];
 
   return (
     <main className="mx-auto min-h-dvh max-w-md px-4 pb-24 pt-5">
       <header className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-medium text-zinc-500">Agosto 2026</p>
+          <p className="text-sm font-medium text-zinc-500">{monthLabel}</p>
           <h1 className="mt-1 text-3xl font-bold tracking-normal text-foreground">Rendiconto</h1>
         </div>
-        <Button variant="secondary" className="h-11 px-3" aria-label="Aggiungi movimento">
+        <Link href="/movements/new" className="inline-flex h-11 items-center justify-center rounded-md border border-border bg-white px-3" aria-label="Aggiungi movimento">
           <Plus aria-hidden className="h-5 w-5" />
-        </Button>
+        </Link>
       </header>
 
       <section className="mt-6 grid grid-cols-2 gap-3">
-        <StatTile label="Entrate" value={`EUR ${summary.income}`} tone="good" />
-        <StatTile label="Spese nette" value={`EUR ${summary.netExpenses}`} />
-        <StatTile label="Rimborsi" value={`EUR ${summary.reimbursements}`} />
-        <StatTile label="Saldo econ." value={`EUR ${summary.economicBalance}`} tone="good" />
-      </section>
-
-      <section className="mt-6 rounded-md border border-border bg-white p-4 shadow-panel">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-foreground">Budget mensile</p>
-            <p className="mt-1 text-sm text-zinc-500">Uso calcolato su spese meno rimborsi.</p>
-          </div>
-          <p className="text-right text-sm font-bold tabular-nums">{budget.usedPercentage}%</p>
-        </div>
-        <div className="mt-4 h-3 overflow-hidden rounded-full bg-zinc-100">
-          <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(budget.usedPercentage, 100)}%` }} />
-        </div>
-        <div className="mt-3 flex justify-between text-sm tabular-nums text-zinc-600">
-          <span>EUR {budget.used}</span>
-          <span>EUR {budget.budgetAmount}</span>
-        </div>
+        <StatTile label="Entrate" value={`EUR ${monthlySummary.income}`} tone="good" />
+        <StatTile label="Spese lorde" value={`EUR ${monthlySummary.grossExpenses}`} />
+        <StatTile label="Rimborsi" value={`EUR ${monthlySummary.reimbursements}`} />
+        <StatTile label="Bilancio" value={`EUR ${monthlySummary.economicBalance}`} tone="good" />
       </section>
 
       <section className="mt-6 space-y-3">
-        <h2 className="text-lg font-semibold text-foreground">Conti</h2>
-        {[
-          { name: "Conto corrente", value: "EUR 2850.00", icon: Landmark },
-          { name: "Carta credito", value: "EUR -410.00", icon: CreditCard },
-          { name: "Fondo vacanze", value: "EUR 1200.00", icon: WalletCards }
-        ].map((account) => {
+        <h2 className="text-lg font-semibold text-foreground">Saldi</h2>
+        {accountRows.map((account) => {
           const Icon = account.icon;
           return (
             <div key={account.name} className="flex min-h-16 items-center justify-between rounded-md border border-border bg-white px-4 shadow-panel">
@@ -143,6 +142,18 @@ export function DashboardPreview() {
           );
         })}
       </section>
+
+      {macroCategoryAggregates.length > 0 && (
+        <section className="mt-6 space-y-3">
+          <h2 className="text-lg font-semibold text-foreground">Macro-categorie</h2>
+          {macroCategoryAggregates.slice(0, 5).map((macro) => (
+            <div key={macro.macroCategoryId} className="flex min-h-14 items-center justify-between rounded-md border border-border bg-white px-4 shadow-panel">
+              <span className="font-medium">{macro.macroCategoryName}</span>
+              <span className="font-semibold tabular-nums">EUR {macro.netExpenses}</span>
+            </div>
+          ))}
+        </section>
+      )}
     </main>
   );
 }

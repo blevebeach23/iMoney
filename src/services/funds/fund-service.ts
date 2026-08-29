@@ -1,7 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { z } from "zod";
+import { calculateFundBalance } from "@/lib/calculations/balances";
 import type { fundFormSchema } from "@/lib/master-data/validation";
-import type { Fund } from "@/types/domain";
+import type { Fund, Movement, Transfer } from "@/types/domain";
 
 type FundInput = z.infer<typeof fundFormSchema>;
 
@@ -69,6 +70,10 @@ export async function deactivateFund(supabase: SupabaseClient, userId: string, f
   if (error) {
     throw error;
   }
+}
+
+export function getRebuiltFundBalance(fund: Fund, movements: Movement[], transfers: Transfer[], cutoffDate: string): string {
+  return calculateFundBalance(fund, movements, transfers, cutoffDate);
 }
 
 function mapFundRow(row: Record<string, unknown>): Fund {

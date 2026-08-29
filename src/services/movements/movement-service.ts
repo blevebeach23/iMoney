@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Movement } from "@/types/domain";
+import type { MovementCategoryInfo } from "@/lib/calculations/category-aggregates";
 import type { MovementFormInput } from "@/lib/movements/validation";
 
 type MovementRow = Record<string, unknown>;
@@ -97,6 +98,59 @@ export async function getMonthlyMovements(
   }
 
   return (data ?? []).map(mapMovementRow);
+}
+
+export async function getMovementsUntil(supabase: SupabaseClient, userId: string, cutoffDate: string): Promise<Movement[]> {
+  const { data, error } = await supabase
+    .from("movements")
+    .select("*")
+    .eq("owner_user_id", userId)
+    .is("deleted_at", null)
+    .lte("occurred_on", cutoffDate)
+    .order("occurred_on", { ascending: true });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).map(mapMovementRow);
+}
+
+export async function getMovementCategoryInfo(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<Map<string, MovementCategoryInfo>> {
+  const { data, error } = await supabase
+    .from("macro_categories")
+    .select("id, name, categories(id, name)")
+    .eq("owner_user_id", userId)
+    .is("deleted_at", null);
+
+  if (error) {
+    throw error;
+  }
+
+  const map = new Map<string, MovementCategoryInfo>();
+
+  for (const macro of data ?? []) {
+    const macroRow = asRecord(macro);
+    const categories = Array.isArray(macroRow?.categories) ? macroRow.categories : [];
+    for (const category of categories) {
+      const categoryRow = asRecord(category);
+      if (!categoryRow?.id) {
+        continue;
+      }
+
+      map.set(String(categoryRow.id), {
+        categoryId: String(categoryRow.id),
+        categoryName: String(categoryRow.name ?? ""),
+        macroCategoryId: String(macroRow?.id ?? ""),
+        macroCategoryName: String(macroRow?.name ?? "")
+      });
+    }
+  }
+
+  return map;
 }
 
 export async function getMovementById(supabase: SupabaseClient, userId: string, movementId: string): Promise<MovementListItem | null> {
