@@ -16,6 +16,9 @@ export const metadata: Metadata = {
   formatDetection: {
     telephone: false
   },
+  other: {
+    "mobile-web-app-capable": "yes"
+  },
   icons: {
     icon: [
       { url: "/icon.svg", type: "image/svg+xml" },
