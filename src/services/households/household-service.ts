@@ -108,7 +108,7 @@ export async function getHouseholdById(supabase: SupabaseClient, householdId: st
 export async function getHouseholdMembers(supabase: SupabaseClient, householdId: string): Promise<HouseholdMemberListItem[]> {
   const { data, error } = await supabase
     .from("household_members")
-    .select("*, profiles(full_name, username)")
+    .select("*, profiles!household_members_user_id_fkey(full_name, username)")
     .eq("household_id", householdId)
     .order("created_at", { ascending: true });
 

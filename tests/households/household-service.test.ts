@@ -1,11 +1,23 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createHousehold } from "@/services/households/household-service";
+import { createHousehold, getHouseholdMembers } from "@/services/households/household-service";
 
 function supabaseWithRpc(result: { data: string | null; error: null | { code: string; details: string; hint: string; message: string; status: number } }) {
   return {
     rpc: vi.fn().mockResolvedValue(result)
   } as unknown as SupabaseClient;
+}
+
+function supabaseWithHouseholdMembers() {
+  const order = vi.fn().mockResolvedValue({ data: [], error: null });
+  const eq = vi.fn().mockReturnValue({ order });
+  const select = vi.fn().mockReturnValue({ eq });
+  const from = vi.fn().mockReturnValue({ select });
+
+  return {
+    supabase: { from } as unknown as SupabaseClient,
+    select
+  };
 }
 
 describe("household service", () => {
@@ -50,5 +62,13 @@ describe("household service", () => {
       status: 403
     });
     expect(JSON.stringify(consoleError.mock.calls)).not.toContain("Famiglia Segreta");
+  });
+
+  it("embeds member profiles through the user_id foreign key", async () => {
+    const { supabase, select } = supabaseWithHouseholdMembers();
+
+    await expect(getHouseholdMembers(supabase, "10000000-0000-0000-0000-000000000001")).resolves.toEqual([]);
+
+    expect(select).toHaveBeenCalledWith("*, profiles!household_members_user_id_fkey(full_name, username)");
   });
 });
