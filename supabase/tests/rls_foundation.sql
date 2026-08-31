@@ -106,6 +106,21 @@ set local role authenticated;
 
 select test.set_auth('00000000-0000-0000-0000-0000000000a1', 'a@example.test');
 select test.ok('User A reads own movement', exists(select 1 from public.movements where id = '60000000-0000-0000-0000-0000000000a1'));
+select test.ok('User A can create initial household through RPC', public.create_household('Household RPC') is not null);
+select test.ok(
+  'User A becomes active owner after household RPC',
+  exists(
+    select 1
+    from public.household_members hm
+    join public.households h on h.id = hm.household_id
+    where h.name = 'Household RPC'
+      and h.created_by = '00000000-0000-0000-0000-0000000000a1'
+      and hm.user_id = '00000000-0000-0000-0000-0000000000a1'
+      and hm.role = 'owner'
+      and hm.status = 'ACTIVE'
+      and hm.joined_at is not null
+  )
+);
 
 select test.set_auth('00000000-0000-0000-0000-0000000000b1', 'b@example.test');
 select test.ok('User B same household cannot read A private movement', not exists(select 1 from public.movements where id = '60000000-0000-0000-0000-0000000000a1'));

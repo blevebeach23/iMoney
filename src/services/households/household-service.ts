@@ -3,6 +3,13 @@ import { randomUUID } from "crypto";
 import type { Household, HouseholdInvite, HouseholdMember, HouseholdRole, HouseholdMemberStatus } from "@/types/domain";
 
 type Row = Record<string, unknown>;
+type SupabaseErrorDetails = {
+  code?: string;
+  details?: string;
+  hint?: string;
+  message?: string;
+  status?: number;
+};
 
 export interface ActiveHouseholdOption {
   id: string;
@@ -67,41 +74,17 @@ export async function getActiveHouseholds(supabase: SupabaseClient, userId: stri
   return getActiveHouseholdOptions(supabase, userId);
 }
 
-export async function createHousehold(supabase: SupabaseClient, userId: string, name: string) {
-  const { data, error } = await supabase
-    .from("households")
-    .insert({ name, created_by: userId })
-    .select("id")
-    .single();
+export async function createHousehold(supabase: SupabaseClient, _userId: string, name: string) {
+  const { data, error } = await supabase.rpc("create_household", {
+    household_name: name
+  });
 
   if (error) {
+    logSupabaseError("create_household_rpc", error);
     throw error;
   }
 
-  const householdId = String(data.id);
-  const { error: memberError } = await supabase.from("household_members").insert({
-    household_id: householdId,
-    user_id: userId,
-    role: "owner",
-    status: "ACTIVE",
-    joined_at: new Date().toISOString()
-  });
-
-  if (memberError) {
-    throw memberError;
-  }
-
-  const { error: preferenceError } = await supabase.from("household_user_preferences").insert({
-    household_id: householdId,
-    user_id: userId,
-    preferences: { share_new_movements_by_default: false }
-  });
-
-  if (preferenceError) {
-    throw preferenceError;
-  }
-
-  return householdId;
+  return String(data);
 }
 
 export async function updateHouseholdName(supabase: SupabaseClient, householdId: string, name: string) {
@@ -290,4 +273,15 @@ function asRecord(value: unknown): Row | null {
   }
 
   return null;
+}
+
+function logSupabaseError(operation: string, error: SupabaseErrorDetails) {
+  console.error("[households] Supabase operation failed", {
+    operation,
+    code: error.code,
+    message: error.message,
+    details: error.details,
+    hint: error.hint,
+    status: error.status
+  });
 }
