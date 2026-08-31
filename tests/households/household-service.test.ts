@@ -49,6 +49,27 @@ function supabaseWithInviteLookup(isRegistered: boolean) {
   };
 }
 
+function supabaseAdminInviteClient() {
+  const inviteUserByEmail = vi.fn().mockResolvedValue({ data: {}, error: null });
+  const eq = vi.fn().mockResolvedValue({ data: null, error: null });
+  const update = vi.fn().mockReturnValue({ eq });
+  const from = vi.fn().mockReturnValue({ update });
+
+  return {
+    adminClient: {
+      auth: {
+        admin: {
+          inviteUserByEmail
+        }
+      },
+      from
+    },
+    from,
+    inviteUserByEmail,
+    update
+  };
+}
+
 function supabaseWithPendingInvites() {
   const order = vi.fn().mockResolvedValue({ data: [], error: null });
   const gt = vi.fn().mockReturnValue({ order });
@@ -129,16 +150,19 @@ describe("household service", () => {
 
   it("marks invites for already registered users", async () => {
     const { supabase, insert, rpc } = supabaseWithInviteLookup(true);
+    const adminClientFactory = vi.fn();
 
     const invite = await createHouseholdInvite(
       supabase,
       "10000000-0000-0000-0000-000000000001",
       "00000000-0000-0000-0000-0000000000a1",
-      "anna@example.test"
+      "anna@example.test",
+      adminClientFactory
     );
 
     expect(invite.isRegistered).toBe(true);
     expect(invite.token).toHaveLength(64);
+    expect(adminClientFactory).not.toHaveBeenCalled();
     expect(rpc).toHaveBeenCalledWith("household_email_has_valid_member", {
       candidate_household_id: "10000000-0000-0000-0000-000000000001",
       candidate_email: "anna@example.test"
@@ -152,6 +176,30 @@ describe("household service", () => {
         status: "PENDING"
       })
     );
+  });
+
+  it("creates a household invite and sends a Supabase Auth email for an unregistered user", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://i-money-five.vercel.app");
+    const { supabase, insert } = supabaseWithInviteLookup(false);
+    const { adminClient, inviteUserByEmail } = supabaseAdminInviteClient();
+    const adminClientFactory = vi.fn(() => adminClient);
+
+    const invite = await createHouseholdInvite(
+      supabase,
+      "10000000-0000-0000-0000-000000000001",
+      "00000000-0000-0000-0000-0000000000a1",
+      "new@example.test",
+      adminClientFactory
+    );
+
+    expect(invite.isRegistered).toBe(false);
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ email: "new@example.test", token: invite.token, status: "PENDING" }));
+    expect(inviteUserByEmail).toHaveBeenCalledWith("new@example.test", {
+      redirectTo: `https://i-money-five.vercel.app/auth/confirm?next=${encodeURIComponent(`/family/invites/${invite.token}`)}`,
+      data: {
+        household_invite_token: invite.token
+      }
+    });
   });
 
   it("rejects owner self-invites when the email already belongs to a valid household member", async () => {
@@ -201,15 +249,70 @@ describe("household service", () => {
 
   it("keeps a registration link token for users not registered yet", async () => {
     const { supabase } = supabaseWithInviteLookup(false);
+    const { adminClient } = supabaseAdminInviteClient();
 
     await expect(
       createHouseholdInvite(
         supabase,
         "10000000-0000-0000-0000-000000000001",
         "00000000-0000-0000-0000-0000000000a1",
-        "new@example.test"
+        "new@example.test",
+        () => adminClient
       )
     ).resolves.toMatchObject({ isRegistered: false });
+  });
+
+  it("expires the household invite and returns a clear message when Auth email delivery fails", async () => {
+    const { supabase } = supabaseWithInviteLookup(false);
+    const { adminClient, inviteUserByEmail, update } = supabaseAdminInviteClient();
+    inviteUserByEmail.mockResolvedValueOnce({
+      data: null,
+      error: { code: "email_failed", message: "SMTP failed", details: null, hint: null, status: 500 }
+    });
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(
+      createHouseholdInvite(
+        supabase,
+        "10000000-0000-0000-0000-000000000001",
+        "00000000-0000-0000-0000-0000000000a1",
+        "new@example.test",
+        () => adminClient
+      )
+    ).rejects.toMatchObject({
+      code: "email_delivery_failed",
+      message: "Invito non inviato. Controlla la configurazione email e riprova."
+    });
+
+    expect(update).toHaveBeenCalledWith({ status: "EXPIRED" });
+    expect(consoleError).toHaveBeenCalledWith("[households] Supabase operation failed", expect.objectContaining({ operation: "household_invite_auth_email" }));
+  });
+
+  it("returns a clear message when the server-side admin invite client is not configured", async () => {
+    const { supabase, insert } = supabaseWithInviteLookup(false);
+    const eq = vi.fn().mockResolvedValue({ data: null, error: null });
+    const update = vi.fn().mockReturnValue({ eq });
+    insert.mockResolvedValueOnce({ error: null });
+    vi.mocked(supabase.from).mockReturnValueOnce({ insert } as never).mockReturnValueOnce({ update } as never);
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(
+      createHouseholdInvite(
+        supabase,
+        "10000000-0000-0000-0000-000000000001",
+        "00000000-0000-0000-0000-0000000000a1",
+        "new@example.test",
+        () => {
+          throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
+        }
+      )
+    ).rejects.toMatchObject({
+      code: "email_delivery_failed",
+      message: "Invito non inviato. Configurazione email non disponibile."
+    });
+
+    expect(update).toHaveBeenCalledWith({ status: "EXPIRED" });
+    expect(consoleError).toHaveBeenCalledWith("[households] Supabase operation failed", expect.objectContaining({ operation: "household_invite_admin_client" }));
   });
 
   it("loads household names for pending invite notifications", async () => {

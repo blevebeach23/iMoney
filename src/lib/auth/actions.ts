@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { localRedirectPath, siteUrl } from "@/lib/site-url";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
   forgotPasswordSchema,
@@ -12,15 +13,6 @@ import {
   toFieldErrors,
   type FormState
 } from "./validation";
-
-function siteUrl() {
-  return process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-}
-
-function localRedirectPath(value: FormDataEntryValue | null, fallback = "/onboarding") {
-  const path = String(value || fallback);
-  return path.startsWith("/") && !path.startsWith("//") ? path : fallback;
-}
 
 async function isEmailRegistered(supabase: ReturnType<typeof createServerSupabaseClient>, email: string): Promise<boolean> {
   const { data, error } = await supabase.rpc("email_is_registered", {

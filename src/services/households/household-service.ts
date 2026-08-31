@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { randomUUID } from "crypto";
+import { absoluteUrl } from "@/lib/site-url";
 import type { Household, HouseholdInvite, HouseholdMember, HouseholdRole, HouseholdMemberStatus } from "@/types/domain";
 
 type Row = Record<string, unknown>;
@@ -31,12 +32,27 @@ export interface HouseholdInviteListItem extends HouseholdInvite {
 
 export class HouseholdInviteError extends Error {
   constructor(
-    readonly code: "already_member" | "pending_invite_exists",
+    readonly code: "already_member" | "pending_invite_exists" | "email_delivery_failed",
     message: string
   ) {
     super(message);
     this.name = "HouseholdInviteError";
   }
+}
+
+interface SupabaseAuthAdminInviteClient {
+  auth: {
+    admin: {
+      inviteUserByEmail: (
+        email: string,
+        options: {
+          data?: Record<string, string>;
+          redirectTo: string;
+        }
+      ) => Promise<{ data: unknown; error: SupabaseErrorDetails | null }>;
+    };
+  };
+  from: SupabaseClient["from"];
 }
 
 export async function getActiveHouseholdOptions(supabase: SupabaseClient, userId: string): Promise<ActiveHouseholdOption[]> {
@@ -150,7 +166,13 @@ export async function removeHouseholdMember(supabase: SupabaseClient, householdI
   }
 }
 
-export async function createHouseholdInvite(supabase: SupabaseClient, householdId: string, invitedBy: string, email: string) {
+export async function createHouseholdInvite(
+  supabase: SupabaseClient,
+  householdId: string,
+  invitedBy: string,
+  email: string,
+  adminClientFactory?: () => SupabaseAuthAdminInviteClient
+) {
   const normalizedEmail = email.trim().toLowerCase();
   const { data: alreadyMember, error: memberLookupError } = await supabase.rpc("household_email_has_valid_member", {
     candidate_household_id: householdId,
@@ -196,10 +218,50 @@ export async function createHouseholdInvite(supabase: SupabaseClient, householdI
     throw error;
   }
 
+  if (!isRegistered) {
+    if (!adminClientFactory) {
+      throw new HouseholdInviteError("email_delivery_failed", "Invito creato, ma invio email non configurato.");
+    }
+
+    let adminClient: SupabaseAuthAdminInviteClient;
+
+    try {
+      adminClient = adminClientFactory();
+    } catch (error) {
+      await expireHouseholdInvite(supabase, token);
+      logSupabaseError("household_invite_admin_client", {
+        message: error instanceof Error ? error.message : String(error)
+      });
+      throw new HouseholdInviteError("email_delivery_failed", "Invito non inviato. Configurazione email non disponibile.");
+    }
+
+    const redirectTo = absoluteUrl(`/auth/confirm?next=${encodeURIComponent(`/family/invites/${token}`)}`);
+    const { error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(normalizedEmail, {
+      redirectTo,
+      data: {
+        household_invite_token: token
+      }
+    });
+
+    if (inviteError) {
+      await expireHouseholdInvite(adminClient, token);
+      logSupabaseError("household_invite_auth_email", inviteError);
+      throw new HouseholdInviteError("email_delivery_failed", "Invito non inviato. Controlla la configurazione email e riprova.");
+    }
+  }
+
   return {
     token,
     isRegistered: Boolean(isRegistered)
   };
+}
+
+async function expireHouseholdInvite(client: Pick<SupabaseClient, "from">, token: string) {
+  const { error } = await client.from("household_invites").update({ status: "EXPIRED" }).eq("token", token);
+
+  if (error) {
+    logSupabaseError("household_invite_expire_after_email_failure", error);
+  }
 }
 
 export async function getHouseholdInvites(supabase: SupabaseClient, householdId: string): Promise<HouseholdInviteListItem[]> {

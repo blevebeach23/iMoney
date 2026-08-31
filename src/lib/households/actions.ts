@@ -11,6 +11,7 @@ import {
   householdMemberRoleSchema,
   householdPreferenceSchema
 } from "@/lib/households/validation";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
   createHousehold,
@@ -91,7 +92,7 @@ export async function inviteHouseholdMemberAction(_prevState: FormState, formDat
 
   try {
     const { supabase, user } = await requireUser();
-    const invite = await createHouseholdInvite(supabase, parsed.data.householdId, user.id, parsed.data.email);
+    const invite = await createHouseholdInvite(supabase, parsed.data.householdId, user.id, parsed.data.email, createSupabaseAdminClient);
     revalidatePath("/family/settings");
     revalidatePath("/notifications");
 
@@ -99,7 +100,7 @@ export async function inviteHouseholdMemberAction(_prevState: FormState, formDat
       return { ok: true, message: "Invito creato. L'utente registrato lo vedrà nelle notifiche interne." };
     }
 
-    return { ok: true, message: `Invito creato. Link registrazione/invito: /family/invites/${invite.token}` };
+    return { ok: true, message: "Invito creato. L'utente riceverà una email per registrarsi e accettare la famiglia." };
   } catch (error) {
     return { ok: false, message: messageFromError(error) };
   }
