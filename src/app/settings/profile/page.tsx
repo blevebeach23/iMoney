@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { ProfileForm } from "@/components/auth/profile-form";
+import { PushSettings } from "@/components/notifications/push-settings";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { getPushSubscriptionCount } from "@/services/notifications/notification-service";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +26,8 @@ export default async function ProfilePage() {
     throw error;
   }
 
+  const pushSubscriptionCount = await getPushSubscriptionCount(supabase, user.id);
+
   return (
     <main className="mx-auto min-h-dvh max-w-md px-4 pb-24 pt-6">
       <header className="mb-6">
@@ -31,6 +35,7 @@ export default async function ProfilePage() {
         <h1 className="mt-2 text-3xl font-bold tracking-normal text-foreground">Profilo</h1>
       </header>
       <ProfileForm fullName={profile.full_name} username={profile.username} phone={profile.phone} email={user.email ?? ""} />
+      <PushSettings activeSubscriptionCount={pushSubscriptionCount} vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ""} />
     </main>
   );
 }

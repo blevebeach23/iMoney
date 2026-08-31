@@ -56,25 +56,31 @@ export async function createBudget(supabase: SupabaseClient, userId: string, inp
 }
 
 export async function createHouseholdBudget(supabase: SupabaseClient, householdId: string, input: BudgetFormInput) {
-  const { error } = await supabase.from("budgets").insert(toHouseholdBudgetPayload(householdId, input));
+  const { data, error } = await supabase.from("budgets").insert(toHouseholdBudgetPayload(householdId, input)).select("*, macro_categories(name), categories(name)").single();
 
   if (error) {
     throw error;
   }
+
+  return mapBudgetListRow(data);
 }
 
 export async function updateHouseholdBudget(supabase: SupabaseClient, householdId: string, input: BudgetFormInput & { id: string }) {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("budgets")
     .update(toHouseholdBudgetPayload(householdId, input))
     .eq("id", input.id)
     .eq("owner_type", "HOUSEHOLD")
     .eq("household_id", householdId)
-    .is("deleted_at", null);
+    .is("deleted_at", null)
+    .select("*, macro_categories(name), categories(name)")
+    .single();
 
   if (error) {
     throw error;
   }
+
+  return mapBudgetListRow(data);
 }
 
 export async function deactivateHouseholdBudget(supabase: SupabaseClient, householdId: string, budgetId: string) {

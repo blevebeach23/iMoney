@@ -244,24 +244,34 @@ export async function getMovementById(supabase: SupabaseClient, userId: string, 
 }
 
 export async function createMovement(supabase: SupabaseClient, userId: string, input: MovementFormInput) {
-  const { error } = await supabase.from("movements").insert(toMovementPayload(userId, input, true));
+  const { data, error } = await supabase
+    .from("movements")
+    .insert(toMovementPayload(userId, input, true))
+    .select("*, categories(name, macro_categories(id, name)), accounts(name), funds(name)")
+    .single();
 
   if (error) {
     throw error;
   }
+
+  return stripRawCategory(mapMovementListRow(data));
 }
 
 export async function updateMovement(supabase: SupabaseClient, userId: string, input: MovementFormInput & { id: string }) {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("movements")
     .update(toMovementPayload(userId, input, false))
     .eq("id", input.id)
     .eq("owner_user_id", userId)
-    .is("deleted_at", null);
+    .is("deleted_at", null)
+    .select("*, categories(name, macro_categories(id, name)), accounts(name), funds(name)")
+    .single();
 
   if (error) {
     throw error;
   }
+
+  return stripRawCategory(mapMovementListRow(data));
 }
 
 export async function softDeleteMovement(supabase: SupabaseClient, userId: string, movementId: string) {

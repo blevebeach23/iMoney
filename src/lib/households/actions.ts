@@ -13,6 +13,7 @@ import {
 } from "@/lib/households/validation";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { notifyFamilyEvent } from "@/services/notifications/notification-service";
 import {
   createHousehold,
   createHouseholdInvite,
@@ -147,7 +148,15 @@ export async function respondToHouseholdInviteAction(formData: FormData) {
 
   try {
     const { supabase } = await requireUser();
-    await respondToHouseholdInvite(supabase, parsed.token, parsed.accept);
+    const householdId = await respondToHouseholdInvite(supabase, parsed.token, parsed.accept);
+    await notifyFamilyEvent(
+      supabase,
+      householdId,
+      parsed.accept ? "family_member_joined" : "family_invite_rejected",
+      parsed.accept ? "Nuovo membro in famiglia" : "Invito famiglia rifiutato",
+      parsed.accept ? "Un nuovo membro ha accettato l'invito famiglia." : "Un invito famiglia è stato rifiutato.",
+      `invite:${parsed.token}:${parsed.accept ? "accepted" : "rejected"}`
+    );
     revalidatePath("/family");
     revalidatePath("/family/settings");
     revalidatePath("/notifications");

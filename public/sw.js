@@ -79,3 +79,55 @@ self.addEventListener("fetch", (event) => {
 
   event.respondWith(fetchAndCache(request));
 });
+
+self.addEventListener("push", (event) => {
+  let payload = {
+    title: "iMoney",
+    body: "Hai una nuova notifica.",
+    url: "/notifications",
+    icon: "/icons/icon-192.png",
+    badge: "/icons/favicon-32.png"
+  };
+
+  if (event.data) {
+    try {
+      payload = { ...payload, ...event.data.json() };
+    } catch {
+      payload.body = event.data.text();
+    }
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(payload.title || "iMoney", {
+      body: payload.body || "Hai una nuova notifica.",
+      data: {
+        notificationId: payload.notificationId,
+        type: payload.type,
+        url: payload.url || "/notifications"
+      },
+      icon: payload.icon || "/icons/icon-192.png",
+      badge: payload.badge || "/icons/favicon-32.png"
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl = new URL(event.notification.data?.url || "/notifications", self.location.origin).toString();
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        if ("focus" in client && client.url.startsWith(self.location.origin)) {
+          if ("navigate" in client) {
+            return client.navigate(targetUrl).then(() => client.focus());
+          }
+
+          return client.focus();
+        }
+      }
+
+      return self.clients.openWindow(targetUrl);
+    })
+  );
+});

@@ -1,9 +1,12 @@
 import { Bell, Check, X } from "lucide-react";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { respondToHouseholdInviteAction } from "@/lib/households/actions";
 import { loadPendingInviteNotifications } from "@/lib/households/notifications";
+import { markAllNotificationsReadAction, markNotificationReadAction } from "@/lib/notifications/actions";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { getNotifications, getUnreadNotificationCount } from "@/services/notifications/notification-service";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +24,11 @@ export default async function NotificationsPage({
     redirect("/login");
   }
 
-  const { invites, errorMessage } = await loadPendingInviteNotifications(supabase);
+  const [{ invites, errorMessage }, notifications, unreadCount] = await Promise.all([
+    loadPendingInviteNotifications(supabase),
+    getNotifications(supabase, user.id),
+    getUnreadNotificationCount(supabase, user.id)
+  ]);
   const actionMessage = searchParams?.invite === "errore" ? "Invito non più disponibile o già gestito." : null;
 
   return (
@@ -29,9 +36,54 @@ export default async function NotificationsPage({
       <header className="mb-6">
         <p className="text-sm font-semibold text-primary">Notifiche</p>
         <h1 className="mt-2 text-3xl font-bold tracking-normal text-foreground">Centro notifiche</h1>
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <p className="text-sm text-zinc-600">{unreadCount === 1 ? "1 notifica non letta" : `${unreadCount} notifiche non lette`}</p>
+          {unreadCount > 0 && (
+            <form action={markAllNotificationsReadAction}>
+              <Button type="submit" variant="secondary">
+                Segna tutte come lette
+              </Button>
+            </form>
+          )}
+        </div>
       </header>
 
       <section className="space-y-3">
+        <h2 className="text-lg font-semibold text-foreground">Aggiornamenti</h2>
+        {notifications.length === 0 ? (
+          <p className="rounded-md border border-dashed border-border bg-white p-4 text-sm text-zinc-600">Nessuna notifica.</p>
+        ) : (
+          notifications.map((notification) => (
+            <article key={notification.id} className={`rounded-md border bg-white p-4 shadow-panel ${notification.isRead ? "border-border" : "border-primary/40"}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <span className="rounded-md bg-zinc-100 px-2 py-1 text-xs font-semibold">{notificationTypeLabel(notification.type)}</span>
+                  <h3 className="mt-2 font-semibold text-foreground">{notification.title}</h3>
+                  <p className="mt-1 text-sm leading-6 text-zinc-600">{notification.body}</p>
+                </div>
+                {!notification.isRead && <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-primary" aria-label="Non letta" />}
+              </div>
+              <div className="mt-4 flex items-center gap-2">
+                {notification.destinationUrl && (
+                  <Link href={notification.destinationUrl} className="inline-flex min-h-11 flex-1 items-center justify-center rounded-md bg-primary px-3 text-sm font-semibold text-white">
+                    Apri
+                  </Link>
+                )}
+                {!notification.isRead && (
+                  <form action={markNotificationReadAction} className={notification.destinationUrl ? "flex-1" : "w-full"}>
+                    <input type="hidden" name="id" value={notification.id} />
+                    <Button type="submit" variant="secondary" className="w-full">
+                      Segna come letta
+                    </Button>
+                  </form>
+                )}
+              </div>
+            </article>
+          ))
+        )}
+      </section>
+
+      <section className="mt-6 space-y-3">
         <h2 className="text-lg font-semibold text-foreground">Inviti famiglia</h2>
         {(errorMessage || actionMessage) && (
           <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-900">{actionMessage ?? errorMessage}</p>
@@ -71,10 +123,23 @@ export default async function NotificationsPage({
         )}
       </section>
 
-      <section className="mt-6 rounded-md border border-dashed border-border bg-white p-4">
-        <h2 className="text-lg font-semibold text-foreground">Movimenti e budget</h2>
-        <p className="mt-2 text-sm leading-6 text-zinc-600">Nessuna notifica finanziaria.</p>
-      </section>
     </main>
   );
+}
+
+function notificationTypeLabel(type: string) {
+  if (type.startsWith("movement_")) {
+    return "Movimenti";
+  }
+  if (type.startsWith("budget_")) {
+    return "Budget";
+  }
+  if (type.startsWith("fund_")) {
+    return "Fondi";
+  }
+  if (type.startsWith("reimbursement_")) {
+    return "Rimborsi";
+  }
+
+  return "Family";
 }

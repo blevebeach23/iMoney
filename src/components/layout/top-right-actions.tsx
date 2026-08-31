@@ -3,6 +3,7 @@
 import type { LucideIcon } from "lucide-react";
 import { Bell } from "lucide-react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 interface TopRightAction {
   href: string;
@@ -19,6 +20,24 @@ const actionClassName =
 
 export function TopRightActions({ action }: Readonly<TopRightActionsProps>) {
   const ActionIcon = action?.icon;
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    let isActive = true;
+
+    fetch("/api/notifications/unread-count", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : { count: 0 }))
+      .then((data: { count?: number }) => {
+        if (isActive) {
+          setUnreadCount(Number(data.count ?? 0));
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   return (
     <nav
@@ -29,8 +48,13 @@ export function TopRightActions({ action }: Readonly<TopRightActionsProps>) {
       }}
       aria-label="Azioni rapide"
     >
-      <Link href="/notifications" className={actionClassName} aria-label="Notifiche" title="Notifiche">
+      <Link href="/notifications" className={`${actionClassName} relative`} aria-label="Notifiche" title="Notifiche">
         <Bell aria-hidden className="h-5 w-5" />
+        {unreadCount > 0 && (
+          <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-red-600 px-1.5 text-center text-[11px] font-bold leading-5 text-white">
+            {unreadCount > 9 ? "9+" : unreadCount}
+          </span>
+        )}
       </Link>
       {action && ActionIcon && (
         <Link href={action.href} className={actionClassName} aria-label={action.label} title={action.label}>

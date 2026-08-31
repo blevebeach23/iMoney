@@ -48,7 +48,7 @@ export async function getSharedHouseholdFunds(supabase: SupabaseClient, househol
 }
 
 export async function createFund(supabase: SupabaseClient, userId: string, input: FundInput) {
-  const { error } = await supabase.from("funds").insert({
+  const { data, error } = await supabase.from("funds").insert({
     owner_user_id: userId,
     household_id: input.sharedWithFamily ? input.householdId : null,
     name: input.name,
@@ -60,15 +60,17 @@ export async function createFund(supabase: SupabaseClient, userId: string, input
     target_amount: input.targetAmount,
     target_date: input.targetDate,
     shared_with_family: input.sharedWithFamily
-  });
+  }).select("*").single();
 
   if (error) {
     throw error;
   }
+
+  return mapFundRow(data);
 }
 
 export async function updateFund(supabase: SupabaseClient, userId: string, input: Required<FundInput>) {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("funds")
     .update({
       name: input.name,
@@ -82,11 +84,15 @@ export async function updateFund(supabase: SupabaseClient, userId: string, input
     })
     .eq("id", input.id)
     .eq("owner_user_id", userId)
-    .is("deleted_at", null);
+    .is("deleted_at", null)
+    .select("*")
+    .single();
 
   if (error) {
     throw error;
   }
+
+  return mapFundRow(data);
 }
 
 export async function deactivateFund(supabase: SupabaseClient, userId: string, fundId: string) {

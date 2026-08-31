@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 import { toFieldErrors, type FormState } from "@/lib/auth/validation";
 import { movementFormSchema, parseContainerId } from "@/lib/movements/validation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { createMovement, duplicateMovement, softDeleteMovement, updateMovement } from "@/services/movements/movement-service";
+import { createMovement, duplicateMovement, getMovementById, softDeleteMovement, updateMovement } from "@/services/movements/movement-service";
+import { notifySharedMovement } from "@/services/notifications/notification-service";
 
 async function requireUser() {
   const supabase = createServerSupabaseClient();
@@ -65,9 +66,11 @@ export async function saveMovementAction(_prevState: FormState, formData: FormDa
   try {
     const { supabase, user } = await requireUser();
     if (parsed.data.id) {
-      await updateMovement(supabase, user.id, { ...parsed.data, id: parsed.data.id });
+      const movement = await updateMovement(supabase, user.id, { ...parsed.data, id: parsed.data.id });
+      await notifySharedMovement(supabase, movement, "updated");
     } else {
-      await createMovement(supabase, user.id, parsed.data);
+      const movement = await createMovement(supabase, user.id, parsed.data);
+      await notifySharedMovement(supabase, movement, "created");
     }
   } catch (error) {
     return { ok: false, message: messageFromError(error) };
@@ -80,7 +83,11 @@ export async function saveMovementAction(_prevState: FormState, formData: FormDa
 export async function deleteMovementAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const { supabase, user } = await requireUser();
+  const movement = await getMovementById(supabase, user.id, id);
   await softDeleteMovement(supabase, user.id, id);
+  if (movement) {
+    await notifySharedMovement(supabase, movement, "deleted");
+  }
   revalidatePath("/movements");
   redirect("/movements");
 }

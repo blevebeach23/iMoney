@@ -23,6 +23,7 @@ import {
   updateMacroCategory
 } from "@/services/categories/category-service";
 import { createFund, deactivateFund, updateFund } from "@/services/funds/fund-service";
+import { notifySharedFund } from "@/services/notifications/notification-service";
 import { toFieldErrors, type FormState } from "@/lib/auth/validation";
 
 async function requireUser() {
@@ -89,9 +90,13 @@ export async function saveFundAction(_prevState: FormState, formData: FormData):
   try {
     const { supabase, user } = await requireUser();
     if (parsed.data.id) {
-      await updateFund(supabase, user.id, { ...parsed.data, id: parsed.data.id });
+      const fund = await updateFund(supabase, user.id, { ...parsed.data, id: parsed.data.id });
+      await notifySharedFund(supabase, fund, fund.isSharedWithHousehold ? "updated" : "unshared");
     } else {
-      await createFund(supabase, user.id, parsed.data);
+      const fund = await createFund(supabase, user.id, parsed.data);
+      if (fund.isSharedWithHousehold) {
+        await notifySharedFund(supabase, fund, "created");
+      }
     }
     revalidatePath("/funds");
     revalidatePath("/family");

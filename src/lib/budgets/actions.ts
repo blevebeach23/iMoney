@@ -14,6 +14,7 @@ import {
   updateBudget,
   updateHouseholdBudget
 } from "@/services/budgets/budget-service";
+import { notifyHouseholdBudget } from "@/services/notifications/notification-service";
 
 async function requireUser() {
   const supabase = createServerSupabaseClient();
@@ -88,9 +89,11 @@ export async function saveHouseholdBudgetAction(_prevState: FormState, formData:
   try {
     const { supabase } = await requireUser();
     if (parsed.data.id) {
-      await updateHouseholdBudget(supabase, householdId, { ...parsed.data, id: parsed.data.id });
+      const budget = await updateHouseholdBudget(supabase, householdId, { ...parsed.data, id: parsed.data.id });
+      await notifyHouseholdBudget(supabase, householdId, budget, "updated");
     } else {
-      await createHouseholdBudget(supabase, householdId, parsed.data);
+      const budget = await createHouseholdBudget(supabase, householdId, parsed.data);
+      await notifyHouseholdBudget(supabase, householdId, budget, "created");
     }
   } catch (error) {
     return { ok: false, message: messageFromError(error) };
