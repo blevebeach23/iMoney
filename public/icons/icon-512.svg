@@ -1,5 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="iMoney">
-  <rect width="512" height="512" rx="112" fill="#1f6f5b"/>
-  <circle cx="382" cy="130" r="54" fill="#e0a526"/>
-  <path fill="#f6f7f2" d="M122 160h268a38 38 0 0 1 38 38v154a38 38 0 0 1-38 38H122a38 38 0 0 1-38-38V198a38 38 0 0 1 38-38Zm34 76v96h64v-96h-64Zm100 0v96h134v-96H256Z"/>
-</svg>

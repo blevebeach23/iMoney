@@ -1,6 +1,6 @@
 const CACHE_NAME = "imoney-v1-online-first";
 const OFFLINE_URL = "/offline.html";
-const STATIC_ASSETS = ["/manifest.webmanifest", "/icon.svg", "/icons/icon-192.svg", "/icons/icon-512.svg", "/offline.html"];
+const STATIC_ASSETS = ["/manifest.webmanifest", "/favicon.ico", "/icons/favicon-32.png", "/icons/icon-192.png", "/icons/icon-512.png", "/icons/apple-touch-icon.png", "/offline.html"];
 const EXCLUDED_PATH_PREFIXES = ["/api/", "/auth/", "/_next/"];
 
 function isExcludedRequest(request, url) {

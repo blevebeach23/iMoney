@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = process.cwd();
@@ -71,9 +71,19 @@ function runFetchHandler(handler: FetchHandler, request: Request) {
   return responsePromise;
 }
 
+function pngDimensions(path: string) {
+  const file = readFileSync(path);
+
+  return {
+    width: file.readUInt32BE(16),
+    height: file.readUInt32BE(20)
+  };
+}
+
 describe("PWA readiness", () => {
   it("has an installable manifest for iMoney", () => {
     const manifest = JSON.parse(readFileSync(join(root, "public", "manifest.webmanifest"), "utf8")) as Record<string, unknown>;
+    const icons = manifest.icons as Array<Record<string, unknown>>;
 
     expect(manifest.name).toBe("iMoney");
     expect(manifest.short_name).toBe("iMoney");
@@ -83,7 +93,22 @@ describe("PWA readiness", () => {
     expect(manifest.scope).toBe("/");
     expect(manifest.theme_color).toBe("#1f6f5b");
     expect(Array.isArray(manifest.icons)).toBe(true);
-    expect((manifest.icons as unknown[]).length).toBeGreaterThanOrEqual(3);
+    expect(icons).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any maskable" }),
+        expect.objectContaining({ src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any maskable" }),
+        expect.objectContaining({ src: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" })
+      ])
+    );
+    expect(JSON.stringify(icons)).not.toContain(".svg");
+  });
+
+  it("uses real PNG icon assets with expected dimensions", () => {
+    expect(pngDimensions(join(root, "public", "icons", "icon-192.png"))).toEqual({ width: 192, height: 192 });
+    expect(pngDimensions(join(root, "public", "icons", "icon-512.png"))).toEqual({ width: 512, height: 512 });
+    expect(pngDimensions(join(root, "public", "icons", "apple-touch-icon.png"))).toEqual({ width: 180, height: 180 });
+    expect(pngDimensions(join(root, "public", "icons", "favicon-32.png"))).toEqual({ width: 32, height: 32 });
+    expect(existsSync(join(root, "public", "favicon.ico"))).toBe(true);
   });
 
   it("keeps the service worker online-first with an offline fallback", () => {
@@ -92,6 +117,10 @@ describe("PWA readiness", () => {
     expect(serviceWorker).toContain("fetchNavigation(request)");
     expect(serviceWorker).toContain("fetchAndCache(request)");
     expect(serviceWorker).toContain("/offline.html");
+    expect(serviceWorker).toContain("/icons/icon-192.png");
+    expect(serviceWorker).toContain("/icons/icon-512.png");
+    expect(serviceWorker).toContain("/icons/apple-touch-icon.png");
+    expect(serviceWorker).not.toContain("icon.svg");
     expect(serviceWorker).not.toContain("SUPABASE_SERVICE_ROLE");
     expect(serviceWorker).not.toContain("service_role");
   });
@@ -139,7 +168,7 @@ describe("PWA readiness", () => {
         mode: "navigate"
       })
     );
-    const assetResponse = runFetchHandler(handler, createRequest("https://imoney.example/icon.svg"));
+    const assetResponse = runFetchHandler(handler, createRequest("https://imoney.example/icons/icon-192.png"));
 
     await expect(navigationResponse).resolves.toBeInstanceOf(Response);
     await expect(assetResponse).resolves.toBeInstanceOf(Response);
@@ -153,6 +182,9 @@ describe("PWA readiness", () => {
     expect(layout).toContain("\"mobile-web-app-capable\": \"yes\"");
     expect(layout).toContain("appleWebApp");
     expect(layout).toContain("capable: true");
+    expect(layout).toContain("/icons/apple-touch-icon.png");
+    expect(layout).toContain("/favicon.ico");
+    expect(layout).not.toContain("icon.svg");
   });
 
   it("documents only public Supabase env vars in the example file", () => {
