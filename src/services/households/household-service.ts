@@ -25,6 +25,7 @@ export interface HouseholdMemberListItem extends HouseholdMember {
 }
 
 export interface HouseholdInviteListItem extends HouseholdInvite {
+  householdName?: string;
   invitedByName: string;
 }
 
@@ -140,6 +141,14 @@ export async function removeHouseholdMember(supabase: SupabaseClient, householdI
 }
 
 export async function createHouseholdInvite(supabase: SupabaseClient, householdId: string, invitedBy: string, email: string) {
+  const { data: isRegistered, error: lookupError } = await supabase.rpc("email_is_registered", {
+    candidate_email: email
+  });
+
+  if (lookupError) {
+    throw lookupError;
+  }
+
   const token = `${randomUUID()}${randomUUID()}`.replaceAll("-", "");
   const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 14).toISOString();
   const { error } = await supabase.from("household_invites").insert({
@@ -155,13 +164,16 @@ export async function createHouseholdInvite(supabase: SupabaseClient, householdI
     throw error;
   }
 
-  return token;
+  return {
+    token,
+    isRegistered: Boolean(isRegistered)
+  };
 }
 
 export async function getHouseholdInvites(supabase: SupabaseClient, householdId: string): Promise<HouseholdInviteListItem[]> {
   const { data, error } = await supabase
     .from("household_invites")
-    .select("*, profiles!household_invites_invited_by_fkey(full_name)")
+    .select("*, profiles!household_invites_invited_by_fkey(full_name), households(name)")
     .eq("household_id", householdId)
     .order("created_at", { ascending: false });
 
@@ -175,7 +187,7 @@ export async function getHouseholdInvites(supabase: SupabaseClient, householdId:
 export async function getPendingInvitesForCurrentUser(supabase: SupabaseClient): Promise<HouseholdInviteListItem[]> {
   const { data, error } = await supabase
     .from("household_invites")
-    .select("*, profiles!household_invites_invited_by_fkey(full_name)")
+    .select("*, profiles!household_invites_invited_by_fkey(full_name), households(name)")
     .eq("status", "PENDING")
     .gt("expires_at", new Date().toISOString())
     .order("created_at", { ascending: false });
@@ -253,6 +265,7 @@ function mapHouseholdMemberRow(row: Row): HouseholdMemberListItem {
 
 function mapHouseholdInviteRow(row: Row): HouseholdInviteListItem {
   const invitedByProfile = asRecord(row.profiles);
+  const household = asRecord(row.households);
   return {
     id: String(row.id),
     householdId: String(row.household_id),
@@ -263,6 +276,7 @@ function mapHouseholdInviteRow(row: Row): HouseholdInviteListItem {
     status: row.status as HouseholdInvite["status"],
     expiresAt: String(row.expires_at),
     acceptedBy: row.accepted_by ? String(row.accepted_by) : null,
+    householdName: household?.name ? String(household.name) : undefined,
     invitedByName: String(invitedByProfile?.full_name ?? "Invitante")
   };
 }

@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createHousehold, getHouseholdMembers } from "@/services/households/household-service";
+import { createHousehold, createHouseholdInvite, getHouseholdMembers, getPendingInvitesForCurrentUser } from "@/services/households/household-service";
 
 function supabaseWithRpc(result: { data: string | null; error: null | { code: string; details: string; hint: string; message: string; status: number } }) {
   return {
@@ -11,6 +11,31 @@ function supabaseWithRpc(result: { data: string | null; error: null | { code: st
 function supabaseWithHouseholdMembers() {
   const order = vi.fn().mockResolvedValue({ data: [], error: null });
   const eq = vi.fn().mockReturnValue({ order });
+  const select = vi.fn().mockReturnValue({ eq });
+  const from = vi.fn().mockReturnValue({ select });
+
+  return {
+    supabase: { from } as unknown as SupabaseClient,
+    select
+  };
+}
+
+function supabaseWithInviteLookup(isRegistered: boolean) {
+  const insert = vi.fn().mockResolvedValue({ error: null });
+  const from = vi.fn().mockReturnValue({ insert });
+  const rpc = vi.fn().mockResolvedValue({ data: isRegistered, error: null });
+
+  return {
+    supabase: { from, rpc } as unknown as SupabaseClient,
+    insert,
+    rpc
+  };
+}
+
+function supabaseWithPendingInvites() {
+  const order = vi.fn().mockResolvedValue({ data: [], error: null });
+  const gt = vi.fn().mockReturnValue({ order });
+  const eq = vi.fn().mockReturnValue({ gt });
   const select = vi.fn().mockReturnValue({ eq });
   const from = vi.fn().mockReturnValue({ select });
 
@@ -70,5 +95,49 @@ describe("household service", () => {
     await expect(getHouseholdMembers(supabase, "10000000-0000-0000-0000-000000000001")).resolves.toEqual([]);
 
     expect(select).toHaveBeenCalledWith("*, profiles!household_members_user_id_fkey(full_name, username)");
+  });
+
+  it("marks invites for already registered users", async () => {
+    const { supabase, insert, rpc } = supabaseWithInviteLookup(true);
+
+    const invite = await createHouseholdInvite(
+      supabase,
+      "10000000-0000-0000-0000-000000000001",
+      "00000000-0000-0000-0000-0000000000a1",
+      "anna@example.test"
+    );
+
+    expect(invite.isRegistered).toBe(true);
+    expect(invite.token).toHaveLength(64);
+    expect(rpc).toHaveBeenCalledWith("email_is_registered", { candidate_email: "anna@example.test" });
+    expect(insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        household_id: "10000000-0000-0000-0000-000000000001",
+        invited_by: "00000000-0000-0000-0000-0000000000a1",
+        email: "anna@example.test",
+        status: "PENDING"
+      })
+    );
+  });
+
+  it("keeps a registration link token for users not registered yet", async () => {
+    const { supabase } = supabaseWithInviteLookup(false);
+
+    await expect(
+      createHouseholdInvite(
+        supabase,
+        "10000000-0000-0000-0000-000000000001",
+        "00000000-0000-0000-0000-0000000000a1",
+        "new@example.test"
+      )
+    ).resolves.toMatchObject({ isRegistered: false });
+  });
+
+  it("loads household names for pending invite notifications", async () => {
+    const { supabase, select } = supabaseWithPendingInvites();
+
+    await expect(getPendingInvitesForCurrentUser(supabase)).resolves.toEqual([]);
+
+    expect(select).toHaveBeenCalledWith("*, profiles!household_invites_invited_by_fkey(full_name), households(name)");
   });
 });

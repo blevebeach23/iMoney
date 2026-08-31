@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { loginSchema, profileSchema, registerSchema } from "@/lib/auth/validation";
 
 describe("auth validation", () => {
@@ -34,5 +36,13 @@ describe("auth validation", () => {
   it("keeps username format strict for profile updates", () => {
     expect(profileSchema.safeParse({ fullName: "Vito", username: "vito bleve", phone: "" }).success).toBe(false);
     expect(profileSchema.safeParse({ fullName: "Vito", username: "vito_bleve", phone: "" }).success).toBe(true);
+  });
+
+  it("allows anonymous registration checks without exposing auth rows", () => {
+    const migration = readFileSync(join(process.cwd(), "supabase", "migrations", "025_auth_email_lookup.sql"), "utf8");
+
+    expect(migration).toContain("security definer");
+    expect(migration).toContain("from auth.users");
+    expect(migration).toContain("grant execute on function public.email_is_registered(text) to anon");
   });
 });

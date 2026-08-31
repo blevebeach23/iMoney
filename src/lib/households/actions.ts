@@ -86,9 +86,15 @@ export async function inviteHouseholdMemberAction(_prevState: FormState, formDat
 
   try {
     const { supabase, user } = await requireUser();
-    const token = await createHouseholdInvite(supabase, parsed.data.householdId, user.id, parsed.data.email);
+    const invite = await createHouseholdInvite(supabase, parsed.data.householdId, user.id, parsed.data.email);
     revalidatePath("/family/settings");
-    return { ok: true, message: `/family/invites/${token}` };
+    revalidatePath("/notifications");
+
+    if (invite.isRegistered) {
+      return { ok: true, message: "Invito creato. L'utente registrato lo vedrà nelle notifiche interne." };
+    }
+
+    return { ok: true, message: `Invito creato. Link registrazione/invito: /family/invites/${invite.token}` };
   } catch (error) {
     return { ok: false, message: messageFromError(error) };
   }

@@ -17,6 +17,23 @@ function siteUrl() {
   return process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 }
 
+function localRedirectPath(value: FormDataEntryValue | null, fallback = "/onboarding") {
+  const path = String(value || fallback);
+  return path.startsWith("/") && !path.startsWith("//") ? path : fallback;
+}
+
+async function isEmailRegistered(supabase: ReturnType<typeof createServerSupabaseClient>, email: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc("email_is_registered", {
+    candidate_email: email
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return Boolean(data);
+}
+
 export async function registerAction(_prevState: FormState, formData: FormData): Promise<FormState> {
   const parsed = registerSchema.safeParse(formDataToObject(formData));
 
@@ -25,6 +42,19 @@ export async function registerAction(_prevState: FormState, formData: FormData):
   }
 
   const supabase = createServerSupabaseClient();
+
+  try {
+    if (await isEmailRegistered(supabase, parsed.data.email)) {
+      return {
+        ok: false,
+        message: "Questa mail risulta già registrata. Recupera password.",
+        fieldErrors: { email: ["Questa mail risulta già registrata"] }
+      };
+    }
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : "Operazione non riuscita" };
+  }
+
   const usernameAvailable = await supabase.rpc("is_username_available", {
     candidate_username: parsed.data.username
   });
@@ -41,7 +71,7 @@ export async function registerAction(_prevState: FormState, formData: FormData):
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
-      emailRedirectTo: `${siteUrl()}/auth/confirm`,
+      emailRedirectTo: `${siteUrl()}/auth/confirm?next=${encodeURIComponent(localRedirectPath(formData.get("next")))}`,
       data: {
         full_name: parsed.data.fullName,
         username: parsed.data.username
@@ -50,17 +80,22 @@ export async function registerAction(_prevState: FormState, formData: FormData):
   });
 
   if (error) {
+    if (error.message.toLowerCase().includes("already registered")) {
+      return {
+        ok: false,
+        message: "Questa mail risulta già registrata. Recupera password.",
+        fieldErrors: { email: ["Questa mail risulta già registrata"] }
+      };
+    }
+
     return { ok: false, message: error.message };
   }
 
   if (data.session) {
-    redirect("/onboarding");
+    redirect("/register/completed");
   }
 
-  return {
-    ok: true,
-    message: "Registrazione completata. Controlla l'email se Supabase richiede conferma."
-  };
+  redirect("/register/completed");
 }
 
 export async function loginAction(_prevState: FormState, formData: FormData): Promise<FormState> {
@@ -77,7 +112,7 @@ export async function loginAction(_prevState: FormState, formData: FormData): Pr
     return { ok: false, message: "Email o password non validi" };
   }
 
-  redirect(String(formData.get("next") || "/"));
+  redirect(localRedirectPath(formData.get("next"), "/"));
 }
 
 export async function logoutAction() {

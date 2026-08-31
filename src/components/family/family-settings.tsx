@@ -127,7 +127,7 @@ export function FamilySettings({
                 Crea invito
               </PendingButton>
             </form>
-            {inviteState.ok && inviteState.message && <p className="text-sm font-semibold text-primary">Link invito: {inviteState.message}</p>}
+            {inviteState.ok && inviteState.message && <p className="text-sm font-semibold text-primary">{inviteState.message}</p>}
           </section>
 
           <section className="space-y-3">
