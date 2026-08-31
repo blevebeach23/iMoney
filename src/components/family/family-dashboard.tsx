@@ -5,6 +5,7 @@ import type { AnnualTrendPoint } from "@/lib/calculations/annual-trend";
 import type { BudgetReport } from "@/lib/calculations/budget";
 import type { MacroCategoryAggregate } from "@/lib/calculations/category-aggregates";
 import type { MonthlySummary } from "@/types/domain";
+import type { SharedHouseholdFund } from "@/services/funds/fund-service";
 import type { MovementListItem } from "@/services/movements/movement-service";
 
 function formatDate(value: string) {
@@ -23,6 +24,7 @@ export function FamilyDashboard({
   macroCategoryAggregates,
   monthLabel,
   selectedMonth,
+  sharedFunds,
   summary,
   timeline
 }: Readonly<{
@@ -33,6 +35,7 @@ export function FamilyDashboard({
   macroCategoryAggregates: MacroCategoryAggregate[];
   monthLabel: string;
   selectedMonth: string;
+  sharedFunds: SharedHouseholdFund[];
   summary: MonthlySummary;
   timeline: MovementListItem[];
 }>) {
@@ -83,6 +86,15 @@ export function FamilyDashboard({
           </div>
         )}
       </Link>
+
+      <section className="mt-6 space-y-3">
+        <h2 className="text-lg font-semibold text-foreground">Fondi condivisi</h2>
+        {sharedFunds.length === 0 ? (
+          <p className="rounded-md border border-dashed border-border bg-white p-4 text-sm text-zinc-600">Nessun fondo condiviso.</p>
+        ) : (
+          sharedFunds.map((fund) => <SharedFundCard key={fund.id} fund={fund} />)
+        )}
+      </section>
 
       <section className="mt-6 space-y-3">
         <h2 className="text-lg font-semibold text-foreground">Macro-categorie condivise</h2>
@@ -149,5 +161,32 @@ function FamilyStat({ label, value }: Readonly<{ label: string; value: string }>
       <p className="text-sm font-semibold text-zinc-500">{label}</p>
       <p className="mt-2 text-xl font-bold tabular-nums">EUR {value}</p>
     </div>
+  );
+}
+
+function SharedFundCard({ fund }: Readonly<{ fund: SharedHouseholdFund }>) {
+  const progress = fund.progressPercentage ?? 0;
+
+  return (
+    <article className="rounded-md border border-border bg-white p-4 shadow-panel">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="font-bold tracking-normal text-foreground">{fund.name}</h3>
+          <p className="mt-1 text-sm text-zinc-600">{fund.targetAmount ? `Target EUR ${fund.targetAmount}` : "Target non impostato"}</p>
+        </div>
+        <p className="font-bold tabular-nums text-foreground">EUR {fund.balance}</p>
+      </div>
+      {fund.targetAmount && (
+        <div className="mt-4">
+          <div className="h-2 overflow-hidden rounded-sm bg-zinc-100">
+            <div className="h-full bg-primary" style={{ width: `${progress}%` }} />
+          </div>
+          <div className="mt-2 flex items-center justify-between gap-3 text-xs font-semibold text-zinc-500">
+            <span>{Math.round(progress)}%</span>
+            {fund.targetDate && <span>{fund.targetDate}</span>}
+          </div>
+        </div>
+      )}
+    </article>
   );
 }

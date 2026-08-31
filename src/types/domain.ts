@@ -42,6 +42,7 @@ export interface Account {
 export interface Fund {
   id: string;
   ownerUserId: string;
+  householdId: string | null;
   name: string;
   type: FundType;
   openingBalance: MoneyAmount;
@@ -50,6 +51,7 @@ export interface Fund {
   cachedAt: string | null;
   targetAmount: MoneyAmount | null;
   targetDate: string | null;
+  isSharedWithHousehold: boolean;
   deletedAt: string | null;
 }
 

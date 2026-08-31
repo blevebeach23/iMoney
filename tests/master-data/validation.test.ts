@@ -31,6 +31,27 @@ describe("master data validation", () => {
     ).toBe(false);
   });
 
+  it("requires a household when sharing a fund", () => {
+    const baseFund = {
+      name: "Vacanze",
+      type: "holiday",
+      openingBalance: "100.00",
+      openingBalanceDate: "2026-08-28",
+      targetAmount: "",
+      targetDate: ""
+    };
+
+    expect(fundFormSchema.safeParse({ ...baseFund, sharedWithFamily: false, householdId: "" }).success).toBe(true);
+    expect(fundFormSchema.safeParse({ ...baseFund, sharedWithFamily: true, householdId: "" }).success).toBe(false);
+    expect(
+      fundFormSchema.safeParse({
+        ...baseFund,
+        sharedWithFamily: true,
+        householdId: "10000000-0000-4000-8000-000000000001"
+      }).success
+    ).toBe(true);
+  });
+
   it("validates macro-category ordering", () => {
     expect(macroCategoryFormSchema.safeParse({ name: "AUTO", sortOrder: 1 }).success).toBe(true);
     expect(macroCategoryFormSchema.safeParse({ name: "", sortOrder: -1 }).success).toBe(false);

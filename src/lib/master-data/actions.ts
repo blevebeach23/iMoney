@@ -94,6 +94,7 @@ export async function saveFundAction(_prevState: FormState, formData: FormData):
       await createFund(supabase, user.id, parsed.data);
     }
     revalidatePath("/funds");
+    revalidatePath("/family");
     return { ok: true, message: "Fondo salvato" };
   } catch (error) {
     return { ok: false, message: messageFromError(error) };
@@ -105,6 +106,7 @@ export async function deactivateFundAction(formData: FormData) {
   const { supabase, user } = await requireUser();
   await deactivateFund(supabase, user.id, fundId);
   revalidatePath("/funds");
+  revalidatePath("/family");
 }
 
 export async function saveMacroCategoryAction(_prevState: FormState, formData: FormData): Promise<FormState> {

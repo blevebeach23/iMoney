@@ -9,6 +9,7 @@ import { calculateMonthlySummary } from "@/lib/calculations/monthly-summary";
 import { filterFamilySharedMovements } from "@/lib/households/family-rules";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getHouseholdBudgetsForMonth } from "@/services/budgets/budget-service";
+import { getSharedHouseholdFunds } from "@/services/funds/fund-service";
 import { getMovementCategoryInfo, getSharedHouseholdMovements, getSharedHouseholdMovementsBetween } from "@/services/movements/movement-service";
 import { getActiveHouseholds, getHouseholdById } from "@/services/households/household-service";
 
@@ -52,12 +53,13 @@ export default async function FamilyPage({ searchParams }: Readonly<{ searchPara
   const selectedMonth = firstParam(searchParams.month) ?? formatYearMonth(new Date());
   const range = monthRangeFromYearMonth(selectedMonth);
   const year = Number(range.yearMonth.slice(0, 4));
-  const [household, monthMovements, yearMovements, budgets, categoryInfo] = await Promise.all([
+  const [household, monthMovements, yearMovements, budgets, categoryInfo, sharedFunds] = await Promise.all([
     getHouseholdById(supabase, selectedHouseholdId),
     getSharedHouseholdMovements(supabase, selectedHouseholdId, range.monthStart, range.monthEnd),
     getSharedHouseholdMovementsBetween(supabase, selectedHouseholdId, `${year}-01-01`, `${year}-12-31`),
     getHouseholdBudgetsForMonth(supabase, selectedHouseholdId, range.monthStart),
-    getMovementCategoryInfo(supabase, user.id)
+    getMovementCategoryInfo(supabase, user.id),
+    getSharedHouseholdFunds(supabase, selectedHouseholdId)
   ]);
 
   if (!household) {
@@ -80,6 +82,7 @@ export default async function FamilyPage({ searchParams }: Readonly<{ searchPara
       macroCategoryAggregates={aggregates.macroCategories}
       monthLabel={formatMonthLabel(range.monthStart)}
       selectedMonth={range.yearMonth}
+      sharedFunds={sharedFunds}
       summary={summary}
       timeline={visibleMonthMovements}
     />

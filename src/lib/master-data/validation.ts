@@ -48,7 +48,14 @@ export const fundFormSchema = z.object({
   targetDate: z
     .string()
     .trim()
-    .transform((value) => (value === "" ? null : value))
+    .transform((value) => (value === "" ? null : value)),
+  sharedWithFamily: z.coerce.boolean().default(false),
+  householdId: z
+    .preprocess((value) => (typeof value === "string" && value.trim() === "" ? null : value), z.string().uuid().nullable())
+    .default(null)
+}).refine((value) => !value.sharedWithFamily || value.householdId !== null, {
+  message: "Serve una famiglia attiva per condividere",
+  path: ["sharedWithFamily"]
 });
 
 export const macroCategoryFormSchema = z.object({

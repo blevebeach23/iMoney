@@ -38,6 +38,7 @@ const funds: Fund[] = [
   {
     id: "fund-holiday",
     ownerUserId: "user-1",
+    householdId: null,
     name: "Vacanze",
     type: "holiday",
     openingBalance: "0.00",
@@ -46,6 +47,7 @@ const funds: Fund[] = [
     cachedAt: null,
     targetAmount: null,
     targetDate: null,
+    isSharedWithHousehold: false,
     deletedAt: null
   }
 ];

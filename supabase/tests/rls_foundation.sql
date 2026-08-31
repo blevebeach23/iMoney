@@ -94,6 +94,10 @@ values
   ('50000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000a1', 'A fund'),
   ('50000000-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-0000000000b1', 'B fund');
 
+insert into public.funds(id, owner_user_id, household_id, name, shared_with_family)
+values
+  ('50000000-0000-0000-0000-0000000000a2', '00000000-0000-0000-0000-0000000000a1', '10000000-0000-0000-0000-000000000001', 'A shared fund', true);
+
 insert into public.movements(id, owner_user_id, account_id, category_id, type, amount, occurred_on, description)
 values
   ('60000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000a1', '40000000-0000-0000-0000-0000000000a1', '30000000-0000-0000-0000-0000000000a1', 'expense', 10, current_date, 'private');
@@ -125,9 +129,16 @@ select test.ok(
 select test.set_auth('00000000-0000-0000-0000-0000000000b1', 'b@example.test');
 select test.ok('User B same household cannot read A private movement', not exists(select 1 from public.movements where id = '60000000-0000-0000-0000-0000000000a1'));
 select test.ok('User B active same household can read A shared movement', exists(select 1 from public.movements where id = '60000000-0000-0000-0000-0000000000a2'));
+select test.ok('User B same household can read A shared fund', exists(select 1 from public.funds where id = '50000000-0000-0000-0000-0000000000a2'));
+select test.ok('User B same household cannot read A private fund', not exists(select 1 from public.funds where id = '50000000-0000-0000-0000-0000000000a1'));
+update public.funds
+set name = 'B updated shared fund'
+where id = '50000000-0000-0000-0000-0000000000a2';
+select test.ok('User B same household cannot update A shared fund', exists(select 1 from public.funds where id = '50000000-0000-0000-0000-0000000000a2' and name = 'A shared fund'));
 
 select test.set_auth('00000000-0000-0000-0000-0000000000c1', 'c@example.test');
 select test.ok('User C other household cannot read A shared movement', not exists(select 1 from public.movements where id = '60000000-0000-0000-0000-0000000000a2'));
+select test.ok('User C other household cannot read A shared fund', not exists(select 1 from public.funds where id = '50000000-0000-0000-0000-0000000000a2'));
 
 select test.set_auth('00000000-0000-0000-0000-0000000000a1', 'a@example.test');
 select test.denied('User A cannot share toward unauthorized household', $$

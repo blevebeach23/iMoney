@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { calculateBudgetReport } from "@/lib/calculations/budget";
 import type { MovementCategoryInfo } from "@/lib/calculations/category-aggregates";
-import { filterFamilySharedMovements, isActiveHouseholdMember } from "@/lib/households/family-rules";
+import { filterFamilySharedFunds, filterFamilySharedMovements, isActiveHouseholdMember } from "@/lib/households/family-rules";
 import { householdFormSchema, householdInviteResponseSchema, householdInviteSchema, householdPreferenceSchema } from "@/lib/households/validation";
-import type { Budget, HouseholdMember, Movement } from "@/types/domain";
+import type { Budget, Fund, HouseholdMember, Movement } from "@/types/domain";
 
 function member(partial: Partial<HouseholdMember> = {}): HouseholdMember {
   return {
@@ -37,6 +37,25 @@ function movement(partial: Partial<Movement> = {}): Movement {
     deletedAt: null,
     createdBy: null,
     updatedBy: null,
+    ...partial
+  };
+}
+
+function fund(partial: Partial<Fund> = {}): Fund {
+  return {
+    id: "fund-1",
+    ownerUserId: "user-1",
+    householdId: "household-1",
+    name: "Vacanze",
+    type: "holiday",
+    openingBalance: "100.00",
+    openingBalanceDate: "2026-08-01",
+    cachedBalance: "150.00",
+    cachedAt: null,
+    targetAmount: null,
+    targetDate: null,
+    isSharedWithHousehold: true,
+    deletedAt: null,
     ...partial
   };
 }
@@ -117,5 +136,42 @@ describe("family rules", () => {
 
   it("excludes external household movements", () => {
     expect(filterFamilySharedMovements([movement({ householdId: "household-2" })], "household-1")).toHaveLength(0);
+  });
+
+  it("hides private funds from family", () => {
+    expect(filterFamilySharedFunds([fund({ isSharedWithHousehold: false, householdId: null })], "household-1")).toHaveLength(0);
+  });
+
+  it("shows shared funds in family", () => {
+    expect(filterFamilySharedFunds([fund()], "household-1").map((item) => item.id)).toEqual(["fund-1"]);
+  });
+
+  it("excludes shared funds from external households", () => {
+    expect(filterFamilySharedFunds([fund({ householdId: "household-2" })], "household-1")).toHaveLength(0);
+  });
+
+  it("keeps private movements on a shared fund out of family", () => {
+    const sharedFundId = "fund-1";
+    const privateFundMovement = movement({
+      id: "private-fund-movement",
+      accountId: null,
+      fundId: sharedFundId,
+      householdId: null,
+      isSharedWithHousehold: false
+    });
+
+    expect(filterFamilySharedMovements([privateFundMovement], "household-1")).toHaveLength(0);
+  });
+
+  it("shows shared movements on a shared fund in family", () => {
+    const sharedFundMovement = movement({
+      id: "shared-fund-movement",
+      accountId: null,
+      fundId: "fund-1",
+      householdId: "household-1",
+      isSharedWithHousehold: true
+    });
+
+    expect(filterFamilySharedMovements([sharedFundMovement], "household-1").map((item) => item.id)).toEqual(["shared-fund-movement"]);
   });
 });

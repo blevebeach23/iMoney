@@ -27,6 +27,7 @@ function fund(partial: Partial<Fund> = {}): Fund {
   return {
     id: "fund-1",
     ownerUserId: "user-1",
+    householdId: null,
     name: "Vacanze",
     type: "holiday",
     openingBalance: "200.00",
@@ -35,6 +36,7 @@ function fund(partial: Partial<Fund> = {}): Fund {
     cachedAt: null,
     targetAmount: null,
     targetDate: null,
+    isSharedWithHousehold: false,
     deletedAt: null,
     ...partial
   };
