@@ -1,4 +1,4 @@
-import { CalendarDays, CreditCard, Landmark, Plus, Wallet, WalletCards, type LucideIcon } from "lucide-react";
+import { CalendarDays, CreditCard, Landmark, Wallet, WalletCards, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import type { AnnualTrendPoint } from "@/lib/calculations/annual-trend";
 import type { BudgetReport } from "@/lib/calculations/budget";
@@ -126,16 +126,13 @@ export function DashboardPreview({
 
   return (
     <main className="mx-auto min-h-dvh max-w-md px-4 pb-24 pt-5">
-      <header className="flex items-start justify-between gap-3">
+      <header className="pr-28">
         <div>
           <Link href={`/months/${selectedMonth}`} className="text-sm font-medium text-primary">
             {monthLabel}
           </Link>
           <h1 className="mt-1 text-3xl font-bold tracking-normal text-foreground">Rendiconto</h1>
         </div>
-        <Link href="/add" className="inline-flex h-11 items-center justify-center rounded-md border border-border bg-white px-3" aria-label="Aggiungi operazione">
-          <Plus aria-hidden className="h-5 w-5" />
-        </Link>
       </header>
 
       <form className="mt-5 flex items-end gap-3">

@@ -1,23 +1,25 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { Bell } from "lucide-react";
-import Link from "next/link";
+import { Plus, Settings } from "lucide-react";
 import { BottomNav } from "@/components/layout/bottom-nav";
+import { TopRightActions } from "@/components/layout/top-right-actions";
 
 const publicPrefixes = ["/login", "/register", "/forgot-password", "/auth"];
 
 export function AppChrome({ children }: Readonly<{ children: React.ReactNode }>) {
   const pathname = usePathname();
   const hideNav = publicPrefixes.some((prefix) => pathname.startsWith(prefix)) || pathname.startsWith("/onboarding");
+  const topRightAction =
+    pathname === "/"
+      ? { href: "/add", icon: Plus, label: "Aggiungi movimento" }
+      : pathname === "/family"
+        ? { href: "/family/settings", icon: Settings, label: "Impostazioni famiglia" }
+        : undefined;
 
   return (
     <>
-      {!hideNav && (
-        <Link href="/notifications" className="fixed right-4 top-4 z-20 inline-flex h-11 w-11 items-center justify-center rounded-md border border-border bg-white/95 text-primary shadow-panel backdrop-blur" aria-label="Notifiche">
-          <Bell aria-hidden className="h-5 w-5" />
-        </Link>
-      )}
+      {!hideNav && <TopRightActions action={topRightAction} />}
       {children}
       {!hideNav && <BottomNav />}
     </>

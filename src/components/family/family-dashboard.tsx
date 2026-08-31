@@ -1,4 +1,4 @@
-import { Settings, Share2 } from "lucide-react";
+import { Share2 } from "lucide-react";
 import Link from "next/link";
 import { BudgetProgress } from "@/components/budgets/budget-progress";
 import type { AnnualTrendPoint } from "@/lib/calculations/annual-trend";
@@ -41,14 +41,11 @@ export function FamilyDashboard({
 }>) {
   return (
     <main className="mx-auto min-h-dvh max-w-md px-4 pb-24 pt-5">
-      <header className="flex items-start justify-between gap-3">
+      <header className="pr-28">
         <div>
           <p className="text-sm font-semibold text-primary">{monthLabel}</p>
           <h1 className="mt-1 text-3xl font-bold tracking-normal text-foreground">{householdName}</h1>
         </div>
-        <Link href="/family/settings" className="inline-flex h-11 items-center justify-center rounded-md border border-border bg-white px-3" aria-label="Impostazioni famiglia">
-          <Settings aria-hidden className="h-5 w-5" />
-        </Link>
       </header>
 
       <form className="mt-5 flex items-end gap-3">

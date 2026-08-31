@@ -35,7 +35,7 @@ export default async function FamilyPage({ searchParams }: Readonly<{ searchPara
   if (!selectedHouseholdId) {
     return (
       <main className="mx-auto min-h-dvh max-w-md px-4 pb-24 pt-6">
-        <header className="mb-6">
+        <header className="mb-6 pr-28">
           <p className="text-sm font-semibold text-primary">Famiglia</p>
           <h1 className="mt-2 text-3xl font-bold tracking-normal text-foreground">Dashboard famiglia</h1>
         </header>
