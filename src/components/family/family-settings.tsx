@@ -6,6 +6,7 @@ import { BudgetManager } from "@/components/budgets/budget-manager";
 import { FormMessage, PendingButton, TextField } from "@/components/master-data/field-controls";
 import { Button } from "@/components/ui/button";
 import type { FormState } from "@/lib/auth/validation";
+import { householdInviteStatusLabel, householdMemberStatusLabel } from "@/lib/households/status-labels";
 import {
   inviteHouseholdMemberAction,
   removeHouseholdMemberAction,
@@ -92,7 +93,7 @@ export function FamilySettings({
                     <p className="font-semibold">{member.fullName}</p>
                     <p className="text-sm text-zinc-600">{member.username}</p>
                   </div>
-                  <span className="rounded-md bg-zinc-100 px-2 py-1 text-xs font-semibold">{member.status}</span>
+                  <span className="rounded-md bg-zinc-100 px-2 py-1 text-xs font-semibold">{householdMemberStatusLabel(member.status)}</span>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   <form action={updateHouseholdMemberRoleAction}>
@@ -138,7 +139,7 @@ export function FamilySettings({
               invites.map((invite) => (
                 <article key={invite.id} className="rounded-md border border-border bg-white p-4 shadow-panel">
                   <p className="font-semibold">{invite.email}</p>
-                  <p className="mt-1 text-sm text-zinc-600">{invite.status}</p>
+                  <p className="mt-1 text-sm text-zinc-600">{householdInviteStatusLabel(invite.status)}</p>
                 </article>
               ))
             )}

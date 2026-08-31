@@ -15,6 +15,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
   createHousehold,
   createHouseholdInvite,
+  HouseholdInviteError,
   removeHouseholdMember,
   respondToHouseholdInvite,
   updateHouseholdMemberRole,
@@ -41,6 +42,10 @@ function boolFromForm(value: FormDataEntryValue | null): boolean {
 }
 
 function messageFromError(error: unknown) {
+  if (error instanceof HouseholdInviteError) {
+    return error.message;
+  }
+
   if (error instanceof Error) {
     return error.message;
   }
@@ -136,9 +141,21 @@ export async function respondToHouseholdInviteAction(formData: FormData) {
     token: String(formData.get("token") ?? ""),
     accept: boolFromForm(formData.get("accept"))
   });
-  const { supabase } = await requireUser();
-  await respondToHouseholdInvite(supabase, parsed.token, parsed.accept);
-  revalidatePath("/family");
-  revalidatePath("/family/settings");
-  redirect("/family");
+
+  let destination = parsed.accept ? "/family" : "/notifications";
+
+  try {
+    const { supabase } = await requireUser();
+    await respondToHouseholdInvite(supabase, parsed.token, parsed.accept);
+    revalidatePath("/family");
+    revalidatePath("/family/settings");
+    revalidatePath("/notifications");
+  } catch (error) {
+    console.error("[households] Household invite response failed", {
+      message: error instanceof Error ? error.message : String(error)
+    });
+    destination = "/notifications?invite=errore";
+  }
+
+  redirect(destination);
 }

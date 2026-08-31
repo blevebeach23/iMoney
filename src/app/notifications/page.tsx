@@ -2,12 +2,16 @@ import { Bell, Check, X } from "lucide-react";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { respondToHouseholdInviteAction } from "@/lib/households/actions";
+import { loadPendingInviteNotifications } from "@/lib/households/notifications";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { getPendingInvitesForCurrentUser } from "@/services/households/household-service";
 
 export const dynamic = "force-dynamic";
 
-export default async function NotificationsPage() {
+export default async function NotificationsPage({
+  searchParams
+}: Readonly<{
+  searchParams?: { invite?: string };
+}>) {
   const supabase = createServerSupabaseClient();
   const {
     data: { user }
@@ -17,7 +21,8 @@ export default async function NotificationsPage() {
     redirect("/login");
   }
 
-  const invites = await getPendingInvitesForCurrentUser(supabase);
+  const { invites, errorMessage } = await loadPendingInviteNotifications(supabase);
+  const actionMessage = searchParams?.invite === "errore" ? "Invito non più disponibile o già gestito." : null;
 
   return (
     <main className="mx-auto min-h-dvh max-w-md px-4 pb-24 pt-6">
@@ -28,6 +33,9 @@ export default async function NotificationsPage() {
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-foreground">Inviti famiglia</h2>
+        {(errorMessage || actionMessage) && (
+          <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-900">{actionMessage ?? errorMessage}</p>
+        )}
         {invites.length === 0 ? (
           <p className="rounded-md border border-dashed border-border bg-white p-4 text-sm text-zinc-600">Nessun invito in attesa.</p>
         ) : (

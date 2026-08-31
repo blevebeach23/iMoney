@@ -1,6 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createHousehold, createHouseholdInvite, getHouseholdMembers, getPendingInvitesForCurrentUser } from "@/services/households/household-service";
+import { loadPendingInviteNotifications } from "@/lib/households/notifications";
+import {
+  createHousehold,
+  createHouseholdInvite,
+  getHouseholdMembers,
+  getPendingInvitesForCurrentUser,
+  HouseholdInviteError
+} from "@/services/households/household-service";
 
 function supabaseWithRpc(result: { data: string | null; error: null | { code: string; details: string; hint: string; message: string; status: number } }) {
   return {
@@ -23,7 +30,17 @@ function supabaseWithHouseholdMembers() {
 function supabaseWithInviteLookup(isRegistered: boolean) {
   const insert = vi.fn().mockResolvedValue({ error: null });
   const from = vi.fn().mockReturnValue({ insert });
-  const rpc = vi.fn().mockResolvedValue({ data: isRegistered, error: null });
+  const rpc = vi.fn().mockImplementation((name: string) => {
+    if (name === "household_email_has_valid_member") {
+      return Promise.resolve({ data: false, error: null });
+    }
+
+    if (name === "email_is_registered") {
+      return Promise.resolve({ data: isRegistered, error: null });
+    }
+
+    return Promise.resolve({ data: null, error: null });
+  });
 
   return {
     supabase: { from, rpc } as unknown as SupabaseClient,
@@ -43,6 +60,19 @@ function supabaseWithPendingInvites() {
     supabase: { from } as unknown as SupabaseClient,
     select
   };
+}
+
+function supabaseWithPendingInviteError() {
+  const order = vi.fn().mockResolvedValue({
+    data: null,
+    error: { code: "PGRST500", message: "unexpected invite shape", details: null, hint: null, status: 500 }
+  });
+  const gt = vi.fn().mockReturnValue({ order });
+  const eq = vi.fn().mockReturnValue({ gt });
+  const select = vi.fn().mockReturnValue({ eq });
+  const from = vi.fn().mockReturnValue({ select });
+
+  return { from };
 }
 
 describe("household service", () => {
@@ -109,6 +139,10 @@ describe("household service", () => {
 
     expect(invite.isRegistered).toBe(true);
     expect(invite.token).toHaveLength(64);
+    expect(rpc).toHaveBeenCalledWith("household_email_has_valid_member", {
+      candidate_household_id: "10000000-0000-0000-0000-000000000001",
+      candidate_email: "anna@example.test"
+    });
     expect(rpc).toHaveBeenCalledWith("email_is_registered", { candidate_email: "anna@example.test" });
     expect(insert).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -118,6 +152,51 @@ describe("household service", () => {
         status: "PENDING"
       })
     );
+  });
+
+  it("rejects owner self-invites when the email already belongs to a valid household member", async () => {
+    const insert = vi.fn();
+    const from = vi.fn().mockReturnValue({ insert });
+    const rpc = vi.fn().mockImplementation((name: string) => {
+      if (name === "household_email_has_valid_member") {
+        return Promise.resolve({ data: true, error: null });
+      }
+
+      return Promise.resolve({ data: false, error: null });
+    });
+    const supabase = { from, rpc } as unknown as SupabaseClient;
+
+    await expect(
+      createHouseholdInvite(
+        supabase,
+        "10000000-0000-0000-0000-000000000001",
+        "00000000-0000-0000-0000-0000000000a1",
+        "owner@example.test"
+      )
+    ).rejects.toMatchObject(new HouseholdInviteError("already_member", "Questo utente fa già parte della famiglia."));
+
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("rejects invites for an active member already present in the household", async () => {
+    const insert = vi.fn();
+    const from = vi.fn().mockReturnValue({ insert });
+    const rpc = vi.fn().mockResolvedValue({ data: true, error: null });
+    const supabase = { from, rpc } as unknown as SupabaseClient;
+
+    await expect(
+      createHouseholdInvite(
+        supabase,
+        "10000000-0000-0000-0000-000000000001",
+        "00000000-0000-0000-0000-0000000000a1",
+        "member@example.test"
+      )
+    ).rejects.toMatchObject({
+      code: "already_member",
+      message: "Questo utente fa già parte della famiglia."
+    });
+
+    expect(insert).not.toHaveBeenCalled();
   });
 
   it("keeps a registration link token for users not registered yet", async () => {
@@ -139,5 +218,22 @@ describe("household service", () => {
     await expect(getPendingInvitesForCurrentUser(supabase)).resolves.toEqual([]);
 
     expect(select).toHaveBeenCalledWith("*, profiles!household_invites_invited_by_fkey(full_name), households(name)");
+  });
+
+  it("degrades pending invite notifications without throwing a 500", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const supabase = { from: supabaseWithPendingInviteError().from } as unknown as SupabaseClient;
+
+    await expect(loadPendingInviteNotifications(supabase)).resolves.toEqual({
+      invites: [],
+      errorMessage: "Non è stato possibile caricare gli inviti. Riprova tra poco."
+    });
+    expect(consoleError).toHaveBeenCalledWith("[notifications] Pending household invites failed", {
+      code: "PGRST500",
+      message: "unexpected invite shape",
+      details: null,
+      hint: null,
+      status: 500
+    });
   });
 });

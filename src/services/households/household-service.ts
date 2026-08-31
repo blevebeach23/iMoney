@@ -29,6 +29,16 @@ export interface HouseholdInviteListItem extends HouseholdInvite {
   invitedByName: string;
 }
 
+export class HouseholdInviteError extends Error {
+  constructor(
+    readonly code: "already_member" | "pending_invite_exists",
+    message: string
+  ) {
+    super(message);
+    this.name = "HouseholdInviteError";
+  }
+}
+
 export async function getActiveHouseholdOptions(supabase: SupabaseClient, userId: string): Promise<ActiveHouseholdOption[]> {
   const { data: memberships, error: membershipError } = await supabase
     .from("household_members")
@@ -141,8 +151,22 @@ export async function removeHouseholdMember(supabase: SupabaseClient, householdI
 }
 
 export async function createHouseholdInvite(supabase: SupabaseClient, householdId: string, invitedBy: string, email: string) {
+  const normalizedEmail = email.trim().toLowerCase();
+  const { data: alreadyMember, error: memberLookupError } = await supabase.rpc("household_email_has_valid_member", {
+    candidate_household_id: householdId,
+    candidate_email: normalizedEmail
+  });
+
+  if (memberLookupError) {
+    throw memberLookupError;
+  }
+
+  if (alreadyMember) {
+    throw new HouseholdInviteError("already_member", "Questo utente fa già parte della famiglia.");
+  }
+
   const { data: isRegistered, error: lookupError } = await supabase.rpc("email_is_registered", {
-    candidate_email: email
+    candidate_email: normalizedEmail
   });
 
   if (lookupError) {
@@ -154,13 +178,21 @@ export async function createHouseholdInvite(supabase: SupabaseClient, householdI
   const { error } = await supabase.from("household_invites").insert({
     household_id: householdId,
     invited_by: invitedBy,
-    email,
+    email: normalizedEmail,
     token,
     status: "PENDING",
     expires_at: expiresAt
   });
 
   if (error) {
+    if (error.code === "23505") {
+      throw new HouseholdInviteError("pending_invite_exists", "Esiste già un invito in attesa per questa email.");
+    }
+
+    if (error.message?.includes("Questo utente fa già parte della famiglia")) {
+      throw new HouseholdInviteError("already_member", "Questo utente fa già parte della famiglia.");
+    }
+
     throw error;
   }
 

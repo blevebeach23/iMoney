@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { calculateBudgetReport } from "@/lib/calculations/budget";
 import type { MovementCategoryInfo } from "@/lib/calculations/category-aggregates";
 import { filterFamilySharedFunds, filterFamilySharedMovements, isActiveHouseholdMember } from "@/lib/households/family-rules";
+import { householdInviteStatusLabel, householdMemberStatusLabel } from "@/lib/households/status-labels";
 import { householdFormSchema, householdInviteResponseSchema, householdInviteSchema, householdPreferenceSchema } from "@/lib/households/validation";
 import type { Budget, Fund, HouseholdMember, Movement } from "@/types/domain";
 
@@ -101,6 +102,15 @@ describe("family rules", () => {
   it("detects active membership only", () => {
     expect(isActiveHouseholdMember([member()], "household-1")).toBe(true);
     expect(isActiveHouseholdMember([member({ status: "REMOVED" })], "household-1")).toBe(false);
+  });
+
+  it("translates household enum statuses for presentation", () => {
+    expect(householdInviteStatusLabel("PENDING")).toBe("In attesa");
+    expect(householdInviteStatusLabel("ACCEPTED")).toBe("Accettato");
+    expect(householdInviteStatusLabel("REJECTED")).toBe("Rifiutato");
+    expect(householdMemberStatusLabel("ACTIVE")).toBe("Attivo");
+    expect(householdMemberStatusLabel("INVITED")).toBe("Invitato");
+    expect(householdMemberStatusLabel("REMOVED")).toBe("Rimosso");
   });
 
   it("validates default sharing preference input", () => {
