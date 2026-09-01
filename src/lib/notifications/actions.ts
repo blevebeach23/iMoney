@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { deletePushSubscription, markAllNotificationsRead, markNotificationRead, savePushSubscription } from "@/services/notifications/notification-service";
+import { deletePushSubscription, getUnreadNotificationCount, markNotificationsRead, savePushSubscription } from "@/services/notifications/notification-service";
 
 const endpointSchema = z.string().trim().url();
 
@@ -31,23 +31,12 @@ async function requireUser() {
   return { supabase, user };
 }
 
-export async function markNotificationReadAction(input: FormData | string) {
-  const id = typeof input === "string" ? input : String(input.get("id") ?? "");
+export async function markDisplayedNotificationsReadAction(notificationIds: string[]) {
+  const ids = z.array(z.string().trim().min(1)).max(100).parse(notificationIds);
   const { supabase, user } = await requireUser();
-  await markNotificationRead(supabase, user.id, id);
-  const { getUnreadNotificationCount } = await import("@/services/notifications/notification-service");
+  await markNotificationsRead(supabase, user.id, ids);
   const unreadCount = await getUnreadNotificationCount(supabase, user.id);
   revalidatePath("/notifications");
-  return { ok: true, unreadCount };
-}
-
-export async function markAllNotificationsReadAction() {
-  const { supabase, user } = await requireUser();
-  await markAllNotificationsRead(supabase, user.id);
-  const { getUnreadNotificationCount } = await import("@/services/notifications/notification-service");
-  const unreadCount = await getUnreadNotificationCount(supabase, user.id);
-  revalidatePath("/notifications");
-  revalidatePath("/");
   return { ok: true, unreadCount };
 }
 

@@ -121,9 +121,40 @@ self.addEventListener("push", (event) => {
   );
 });
 
+function normalizeNotificationUrl(value) {
+  try {
+    const url = new URL(value || "/notifications", self.location.origin);
+
+    if (url.origin !== self.location.origin) {
+      return `${self.location.origin}/notifications`;
+    }
+
+    if (!isKnownNotificationRoute(url.pathname)) {
+      return `${self.location.origin}/notifications`;
+    }
+
+    return url.toString();
+  } catch {
+    return `${self.location.origin}/notifications`;
+  }
+}
+
+function isKnownNotificationRoute(pathname) {
+  return (
+    pathname === "/notifications" ||
+    pathname === "/family" ||
+    pathname === "/family/settings" ||
+    pathname === "/budgets" ||
+    /^\/movements\/[^/]+$/.test(pathname) ||
+    /^\/transfers\/[^/]+$/.test(pathname) ||
+    /^\/funds\/[^/]+$/.test(pathname) ||
+    /^\/budgets\/\d{4}\/\d{2}$/.test(pathname)
+  );
+}
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const targetUrl = new URL(event.notification.data?.url || "/notifications", self.location.origin).toString();
+  const targetUrl = normalizeNotificationUrl(event.notification.data?.url);
 
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {

@@ -1,4 +1,5 @@
 import { createCipheriv, createECDH, createHmac, createPrivateKey, randomBytes, sign } from "crypto";
+import { resolveNotificationDestination } from "@/lib/notifications/routes";
 import type { AppNotification, PushSubscriptionInput } from "@/types/notifications";
 
 interface PushPayload {
@@ -101,7 +102,7 @@ function encryptPayload(subscription: PushSubscriptionInput, payload: PushPayloa
 
 export async function sendWebPush(subscription: PushSubscriptionInput, notification: AppNotification): Promise<PushSendResult> {
   try {
-    const url = notification.destinationUrl ?? "/notifications";
+    const url = resolveNotificationDestination(notification);
     const payload: PushPayload = {
       title: notification.title,
       body: notification.body,

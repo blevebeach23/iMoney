@@ -7,6 +7,7 @@ import {
   deletePushSubscription,
   markAllNotificationsRead,
   markNotificationRead,
+  markNotificationsRead,
   notifyHouseholdBudget,
   notifySharedFund,
   notifySharedMovement,
@@ -65,6 +66,7 @@ describe("notification service", () => {
       target_household_id: "household-1",
       notification_type: "movement_shared_created",
       notification_title: "Nuovo movimento condiviso",
+      destination_url: "/movements/10000000-0000-0000-0000-000000000001",
       dedupe_scope: "movement:10000000-0000-0000-0000-000000000001:created"
     }));
   });
@@ -123,6 +125,7 @@ describe("notification service", () => {
     expect(supabase.rpc).toHaveBeenCalledWith("create_household_notifications", expect.objectContaining({
       notification_type: "fund_target_reached",
       notification_title: "Obiettivo fondo raggiunto",
+      destination_url: "/funds/fund-1",
       dedupe_scope: "fund:fund-1:target_reached"
     }));
   });
@@ -153,6 +156,24 @@ describe("notification service", () => {
     await markAllNotificationsRead(supabase, "user-1");
 
     expect(update).toHaveBeenCalledWith(expect.objectContaining({ is_read: true, read_at: expect.any(String) }));
+  });
+
+  it("marks displayed unread notifications as read in one DB update", async () => {
+    const inFilter = vi.fn().mockResolvedValue({ error: null });
+    const chain = {
+      eq: vi.fn(() => chain),
+      in: inFilter
+    };
+    const update = vi.fn().mockReturnValue(chain);
+    const from = vi.fn().mockReturnValue({ update });
+    const supabase = { from } as unknown as SupabaseClient;
+
+    await markNotificationsRead(supabase, "user-1", ["notification-1", "notification-2"]);
+
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ is_read: true, read_at: expect.any(String) }));
+    expect(chain.eq).toHaveBeenCalledWith("recipient_user_id", "user-1");
+    expect(chain.eq).toHaveBeenCalledWith("is_read", false);
+    expect(inFilter).toHaveBeenCalledWith("id", ["notification-1", "notification-2"]);
   });
 
   it("creates and removes push subscriptions for the current user only", async () => {

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { resolveNotificationDestination } from "@/lib/notifications/routes";
 import type { BudgetListItem } from "@/services/budgets/budget-service";
 import type { Fund } from "@/types/domain";
 import type { AppNotification, NotificationType, PushSubscriptionInput } from "@/types/notifications";
@@ -64,6 +65,23 @@ export async function markNotificationRead(supabase: SupabaseClient, userId: str
   }
 }
 
+export async function markNotificationsRead(supabase: SupabaseClient, userId: string, notificationIds: string[]) {
+  if (notificationIds.length === 0) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("notifications")
+    .update({ is_read: true, read_at: new Date().toISOString() })
+    .eq("recipient_user_id", userId)
+    .eq("is_read", false)
+    .in("id", notificationIds);
+
+  if (error) {
+    throw error;
+  }
+}
+
 export async function markAllNotificationsRead(supabase: SupabaseClient, userId: string) {
   const { error } = await supabase
     .from("notifications")
@@ -112,6 +130,14 @@ export async function getPushSubscriptionCount(supabase: SupabaseClient, userId:
 }
 
 export async function createHouseholdNotification(supabase: SupabaseClient, input: HouseholdNotificationInput) {
+  const destinationUrl = resolveNotificationDestination({
+    destinationUrl: input.destinationUrl ?? null,
+    entityId: input.entityId ?? null,
+    entityType: input.entityType ?? null,
+    householdId: input.householdId,
+    metadata: input.metadata ?? {},
+    type: input.type
+  });
   const { data, error } = await supabase.rpc("create_household_notifications", {
     target_household_id: input.householdId,
     notification_type: input.type,
@@ -119,7 +145,7 @@ export async function createHouseholdNotification(supabase: SupabaseClient, inpu
     notification_body: input.body,
     entity_type: input.entityType ?? null,
     entity_id: input.entityId ?? null,
-    destination_url: input.destinationUrl ?? null,
+    destination_url: destinationUrl,
     notification_metadata: input.metadata ?? {},
     dedupe_scope: input.dedupeScope ?? null
   });

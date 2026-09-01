@@ -24,6 +24,10 @@ describe("notification and push configuration", () => {
     expect(serviceWorker).toContain("client.postMessage");
     expect(serviceWorker).toContain("imoney:notification-received");
     expect(serviceWorker).toContain("self.addEventListener(\"notificationclick\"");
+    expect(serviceWorker).toContain("normalizeNotificationUrl");
+    expect(serviceWorker).toContain("url.origin !== self.location.origin");
+    expect(serviceWorker).toContain("isKnownNotificationRoute");
+    expect(serviceWorker).toContain("clients.openWindow(targetUrl)");
     expect(serviceWorker).toContain("/icons/icon-192.png");
   });
 
@@ -58,6 +62,8 @@ describe("notification and push configuration", () => {
     expect(topRightActions).toContain("setUnreadCount(detail.count)");
     expect(topRightActions).toContain("updatePwaAppBadge(nextUnreadCount)");
     expect(topRightActions).toContain("navigator.serviceWorker?.addEventListener(\"message\"");
+    expect(notificationActions).toContain("AutoMarkDisplayedNotificationsRead");
+    expect(notificationActions).toContain("markDisplayedNotificationsReadAction(notificationIds)");
     expect(notificationActions).toContain("emitNotificationUnreadCountChanged(result.unreadCount)");
     expect(notificationActions).toContain("router.refresh()");
   });
@@ -69,5 +75,17 @@ describe("notification and push configuration", () => {
     expect(unreadEvents).toContain("navigator.setAppBadge?.(unreadCount)");
     expect(unreadEvents).toContain("navigator.clearAppBadge?.()");
     expect(unreadEvents).toContain("catch(() => undefined)");
+  });
+
+  it("marks displayed notifications as read automatically and removes manual read controls", () => {
+    const page = readFileSync(join(root, "src", "app", "notifications", "page.tsx"), "utf8");
+    const actions = readFileSync(join(root, "src", "lib", "notifications", "actions.ts"), "utf8");
+
+    expect(page).toContain("AutoMarkDisplayedNotificationsRead");
+    expect(page).toContain("unreadNotificationIds");
+    expect(page).not.toContain("Segna come letta");
+    expect(page).not.toContain("Segna tutte come lette");
+    expect(actions).toContain("markNotificationsRead(supabase, user.id, ids)");
+    expect(actions).not.toContain("respondToHouseholdInvite");
   });
 });

@@ -2,9 +2,10 @@ import { Bell, Check, X } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { MarkAllNotificationsReadButton, MarkNotificationReadButton } from "@/components/notifications/notification-actions";
+import { AutoMarkDisplayedNotificationsRead } from "@/components/notifications/notification-actions";
 import { respondToHouseholdInviteAction } from "@/lib/households/actions";
 import { loadPendingInviteNotifications } from "@/lib/households/notifications";
+import { resolveNotificationDestination } from "@/lib/notifications/routes";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getNotifications, getUnreadNotificationCount } from "@/services/notifications/notification-service";
 
@@ -30,15 +31,16 @@ export default async function NotificationsPage({
     getUnreadNotificationCount(supabase, user.id)
   ]);
   const actionMessage = searchParams?.invite === "errore" ? "Invito non più disponibile o già gestito." : null;
+  const unreadNotificationIds = notifications.filter((notification) => !notification.isRead).map((notification) => notification.id);
 
   return (
     <main className="mx-auto min-h-dvh max-w-md px-4 pb-24 pt-6">
+      <AutoMarkDisplayedNotificationsRead notificationIds={unreadNotificationIds} />
       <header className="mb-6">
         <p className="text-sm font-semibold text-primary">Notifiche</p>
         <h1 className="mt-2 text-3xl font-bold tracking-normal text-foreground">Centro notifiche</h1>
         <div className="mt-3 flex items-center justify-between gap-3">
           <p className="text-sm text-zinc-600">{unreadCount === 1 ? "1 notifica non letta" : `${unreadCount} notifiche non lette`}</p>
-          {unreadCount > 0 && <MarkAllNotificationsReadButton />}
         </div>
       </header>
 
@@ -58,14 +60,9 @@ export default async function NotificationsPage({
                 {!notification.isRead && <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-primary" aria-label="Non letta" />}
               </div>
               <div className="mt-4 flex items-center gap-2">
-                {notification.destinationUrl && (
-                  <Link href={notification.destinationUrl} className="inline-flex min-h-11 flex-1 items-center justify-center rounded-md bg-primary px-3 text-sm font-semibold text-white">
-                    Apri
-                  </Link>
-                )}
-                {!notification.isRead && (
-                  <MarkNotificationReadButton id={notification.id} className={notification.destinationUrl ? "flex-1" : "w-full"} />
-                )}
+                <Link href={resolveNotificationDestination(notification)} className="inline-flex min-h-11 flex-1 items-center justify-center rounded-md bg-primary px-3 text-sm font-semibold text-white">
+                  Apri
+                </Link>
               </div>
             </article>
           ))

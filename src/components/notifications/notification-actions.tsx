@@ -1,52 +1,29 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
-import { Button } from "@/components/ui/button";
-import { markAllNotificationsReadAction, markNotificationReadAction } from "@/lib/notifications/actions";
+import { useEffect, useMemo, useRef } from "react";
+import { markDisplayedNotificationsReadAction } from "@/lib/notifications/actions";
 import { emitNotificationUnreadCountChanged } from "@/lib/notifications/unread-events";
 
-export function MarkNotificationReadButton({ id, className }: Readonly<{ id: string; className?: string }>) {
+export function AutoMarkDisplayedNotificationsRead({ notificationIds }: Readonly<{ notificationIds: string[] }>) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const markedKeyRef = useRef<string | null>(null);
+  const notificationKey = useMemo(() => notificationIds.join(","), [notificationIds]);
 
-  return (
-    <Button
-      type="button"
-      variant="secondary"
-      className={className}
-      disabled={isPending}
-      onClick={() => {
-        startTransition(async () => {
-          const result = await markNotificationReadAction(id);
-          emitNotificationUnreadCountChanged(result.unreadCount);
-          router.refresh();
-        });
-      }}
-    >
-      Segna come letta
-    </Button>
-  );
-}
+  useEffect(() => {
+    if (!notificationKey || markedKeyRef.current === notificationKey) {
+      return;
+    }
 
-export function MarkAllNotificationsReadButton() {
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+    markedKeyRef.current = notificationKey;
 
-  return (
-    <Button
-      type="button"
-      variant="secondary"
-      disabled={isPending}
-      onClick={() => {
-        startTransition(async () => {
-          const result = await markAllNotificationsReadAction();
-          emitNotificationUnreadCountChanged(result.unreadCount);
-          router.refresh();
-        });
-      }}
-    >
-      Segna tutte come lette
-    </Button>
-  );
+    markDisplayedNotificationsReadAction(notificationIds)
+      .then((result) => {
+        emitNotificationUnreadCountChanged(result.unreadCount);
+        router.refresh();
+      })
+      .catch(() => undefined);
+  }, [notificationIds, notificationKey, router]);
+
+  return null;
 }
