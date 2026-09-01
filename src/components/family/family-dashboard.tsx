@@ -10,7 +10,6 @@ import type { MovementListItem } from "@/services/movements/movement-service";
 import { familyTitle } from "@/lib/households/display-name";
 import { fixedExpenseRequestStatusLabel } from "./fixed-expense-request-detail";
 import { movementRequestStatusLabel } from "./movement-request-detail";
-import { fixedExpenseRequestStatusLabel } from "./fixed-expense-request-detail";
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("it-IT", { day: "2-digit", month: "short" }).format(new Date(`${value}T00:00:00`));
@@ -30,7 +29,6 @@ export function FamilyDashboard({
   monthLabel,
   fixedExpenseRequests,
   movementRequests,
-  fixedExpenseRequests,
   selectedMonth,
   sharedFunds,
   summary,
@@ -45,7 +43,6 @@ export function FamilyDashboard({
   monthLabel: string;
   fixedExpenseRequests: FixedExpenseRequest[];
   movementRequests: MovementRequest[];
-  fixedExpenseRequests: FixedExpenseRequest[];
   selectedMonth: string;
   sharedFunds: SharedHouseholdFund[];
   summary: MonthlySummary;

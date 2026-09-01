@@ -94,10 +94,6 @@ export function FixedExpenseForm({
       <FormMessage state={state} />
       {fixedExpense?.id && <input type="hidden" name="id" value={fixedExpense.id} />}
       <input type="hidden" name="householdId" value={selectedHouseholdId ?? ""} />
-<<<<<<< Updated upstream
-=======
-
->>>>>>> Stashed changes
       {!fixedExpense && requestRecipients.length > 0 && (
         <SelectField
           label="Per conto di"
@@ -111,10 +107,6 @@ export function FixedExpenseForm({
           errors={state.fieldErrors}
         />
       )}
-<<<<<<< Updated upstream
-=======
-
->>>>>>> Stashed changes
       <TextField label="Descrizione" name="description" defaultValue={fixedExpense?.description ?? ""} errors={state.fieldErrors} />
       {!isRequestForOtherMember && <SelectField label="Categoria" name="categoryId" defaultValue={fixedExpense?.categoryId ?? categories[0]?.value} options={categories} errors={state.fieldErrors} />}
       <TextField label="Importo" name="amount" defaultValue={fixedExpense?.amount ?? ""} inputMode="decimal" errors={state.fieldErrors} />
@@ -150,16 +142,6 @@ export function FixedExpenseForm({
       <label className="block">
         <span className="text-sm font-semibold text-foreground">Note</span>
         <textarea name="notes" className="mt-2 min-h-24 w-full rounded-md border border-border bg-white px-3 py-3 text-base outline-none ring-primary/20 transition focus:border-primary focus:ring-4" />
-      </label>
-
-      {isRequestForOtherMember && <input type="hidden" name="sharedWithFamily" value="true" />}
-
-      <label className="block">
-        <span className="text-sm font-semibold text-foreground">Note</span>
-        <textarea
-          name="notes"
-          className="mt-2 min-h-24 w-full rounded-md border border-border bg-white px-3 py-3 text-base outline-none ring-primary/20 transition focus:border-primary focus:ring-4"
-        />
       </label>
 
       <PendingButton>

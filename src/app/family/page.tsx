@@ -14,7 +14,6 @@ import { getSharedHouseholdFunds } from "@/services/funds/fund-service";
 import { getMovementCategoryInfo, getSharedHouseholdMovements, getSharedHouseholdMovementsBetween } from "@/services/movements/movement-service";
 import { getActiveHouseholds, getHouseholdById } from "@/services/households/household-service";
 import { getMovementRequestsForHousehold } from "@/services/movements/movement-request-service";
-import { getFixedExpenseRequestsForHousehold } from "@/services/fixed-expenses/fixed-expense-request-service";
 
 export const dynamic = "force-dynamic";
 
@@ -89,7 +88,6 @@ export default async function FamilyPage({ searchParams }: Readonly<{ searchPara
       monthLabel={formatMonthLabel(range.monthStart)}
       fixedExpenseRequests={fixedExpenseRequests}
       movementRequests={movementRequests}
-      fixedExpenseRequests={fixedExpenseRequests}
       selectedMonth={range.yearMonth}
       sharedFunds={sharedFunds}
       summary={summary}
