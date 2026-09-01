@@ -16,6 +16,18 @@ export function resolveNotificationDestination(notification: NotificationDestina
     return `/family/movements/${entityId}`;
   }
 
+  if (notification.entityType === "movement_request" && entityId) {
+    const acceptedMovementId = typeof notification.metadata.acceptedMovementId === "string" && UUID_PATTERN.test(notification.metadata.acceptedMovementId)
+      ? encodeURIComponent(notification.metadata.acceptedMovementId)
+      : null;
+
+    if (notification.type === "movement_request_accepted" && acceptedMovementId) {
+      return `/family/movements/${acceptedMovementId}`;
+    }
+
+    return `/family/movement-requests/${entityId}`;
+  }
+
   if (notification.entityType === "transfer" && entityId) {
     return `/transfers/${entityId}`;
   }
@@ -84,6 +96,7 @@ function isKnownNotificationRoute(pathname: string) {
     pathname === NOTIFICATION_FALLBACK_URL ||
     pathname === "/family" ||
     /^\/family\/movements\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pathname) ||
+    /^\/family\/movement-requests\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pathname) ||
     /^\/movements\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pathname) ||
     /^\/transfers\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pathname) ||
     /^\/funds\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pathname) ||

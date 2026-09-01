@@ -4,9 +4,10 @@ import { BudgetProgress } from "@/components/budgets/budget-progress";
 import type { AnnualTrendPoint } from "@/lib/calculations/annual-trend";
 import type { BudgetReport } from "@/lib/calculations/budget";
 import type { MacroCategoryAggregate } from "@/lib/calculations/category-aggregates";
-import type { MonthlySummary } from "@/types/domain";
+import type { MonthlySummary, MovementRequest } from "@/types/domain";
 import type { SharedHouseholdFund } from "@/services/funds/fund-service";
 import type { MovementListItem } from "@/services/movements/movement-service";
+import { movementRequestStatusLabel } from "./movement-request-detail";
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("it-IT", { day: "2-digit", month: "short" }).format(new Date(`${value}T00:00:00`));
@@ -19,10 +20,12 @@ function movementSign(type: MovementListItem["type"]) {
 export function FamilyDashboard({
   annualTrend,
   budgetReport,
+  currentUserId,
   householdId,
   householdName,
   macroCategoryAggregates,
   monthLabel,
+  movementRequests,
   selectedMonth,
   sharedFunds,
   summary,
@@ -30,15 +33,20 @@ export function FamilyDashboard({
 }: Readonly<{
   annualTrend: AnnualTrendPoint[];
   budgetReport: BudgetReport;
+  currentUserId: string;
   householdId: string;
   householdName: string;
   macroCategoryAggregates: MacroCategoryAggregate[];
   monthLabel: string;
+  movementRequests: MovementRequest[];
   selectedMonth: string;
   sharedFunds: SharedHouseholdFund[];
   summary: MonthlySummary;
   timeline: MovementListItem[];
 }>) {
+  const pendingForMe = movementRequests.filter((request) => request.status === "PENDING" && request.recipientUserId === currentUserId);
+  const sentByMe = movementRequests.filter((request) => request.createdByUserId === currentUserId);
+
   return (
     <main className="mx-auto min-h-dvh max-w-md px-4 pb-24 pt-5">
       <header className="pr-28">
@@ -105,6 +113,12 @@ export function FamilyDashboard({
             </div>
           ))
         )}
+      </section>
+
+      <section className="mt-6 space-y-3">
+        <h2 className="text-lg font-semibold text-foreground">Movimenti in attesa</h2>
+        <MovementRequestGroup emptyText="Nessuna richiesta da approvare." requests={pendingForMe} title="Da approvare" />
+        <MovementRequestGroup emptyText="Nessuna richiesta inviata." requests={sentByMe} title="Inviati da me" />
       </section>
 
       <section className="mt-6 space-y-3">
@@ -185,5 +199,40 @@ function SharedFundCard({ fund }: Readonly<{ fund: SharedHouseholdFund }>) {
         </div>
       )}
     </article>
+  );
+}
+
+function MovementRequestGroup({ emptyText, requests, title }: Readonly<{ emptyText: string; requests: MovementRequest[]; title: string }>) {
+  return (
+    <div className="space-y-2">
+      <h3 className="text-sm font-semibold text-zinc-600">{title}</h3>
+      {requests.length === 0 ? (
+        <p className="rounded-md border border-dashed border-border bg-white p-4 text-sm text-zinc-600">{emptyText}</p>
+      ) : (
+        requests.slice(0, 5).map((request) => <MovementRequestCard key={request.id} request={request} />)
+      )}
+    </div>
+  );
+}
+
+function MovementRequestCard({ request }: Readonly<{ request: MovementRequest }>) {
+  return (
+    <Link href={`/family/movement-requests/${request.id}`} className="block rounded-md border border-border bg-white p-4 shadow-panel">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-zinc-500">{formatDate(request.movementDate)}</p>
+          <h4 className="mt-1 font-bold tracking-normal">{request.description}</h4>
+          <p className="mt-1 text-sm text-zinc-600">
+            {request.creatorName} per {request.recipientName}
+          </p>
+        </div>
+        <div className="text-right">
+          <p className={`font-bold tabular-nums ${request.movementType === "expense" ? "text-red-700" : "text-emerald-700"}`}>
+            {request.movementType === "expense" ? "-" : "+"}EUR {request.amount}
+          </p>
+          <span className="mt-2 inline-flex rounded-md bg-zinc-100 px-2 py-1 text-xs font-semibold">{movementRequestStatusLabel(request.status)}</span>
+        </div>
+      </div>
+    </Link>
   );
 }

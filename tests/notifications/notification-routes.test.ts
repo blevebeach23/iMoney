@@ -44,6 +44,28 @@ describe("notification route mapping", () => {
     );
   });
 
+  it("opens movement request notifications on request or accepted movement routes", () => {
+    expect(
+      resolveNotificationDestination(
+        notification({
+          type: "movement_request_created",
+          entityType: "movement_request",
+          entityId: "10000000-0000-4000-8000-000000000004"
+        })
+      )
+    ).toBe("/family/movement-requests/10000000-0000-4000-8000-000000000004");
+    expect(
+      resolveNotificationDestination(
+        notification({
+          type: "movement_request_accepted",
+          entityType: "movement_request",
+          entityId: "10000000-0000-4000-8000-000000000004",
+          metadata: { acceptedMovementId: "10000000-0000-4000-8000-000000000005" }
+        })
+      )
+    ).toBe("/family/movements/10000000-0000-4000-8000-000000000005");
+  });
+
   it("falls back to notifications when no specific destination is available", () => {
     expect(resolveNotificationDestination(notification({ destinationUrl: null, entityId: null, entityType: null }))).toBe("/notifications");
   });
@@ -80,8 +102,10 @@ describe("notification route mapping", () => {
     expect(sanitizeNotificationDestination("/movement/movement-1")).toBe("/notifications");
     expect(sanitizeNotificationDestination("/movements/movement-1")).toBe("/notifications");
     expect(sanitizeNotificationDestination("/family/movements/movement-1")).toBe("/notifications");
+    expect(sanitizeNotificationDestination("/family/movement-requests/movement-1")).toBe("/notifications");
     expect(sanitizeNotificationDestination("/movements/10000000-0000-4000-8000-000000000001")).toBe("/movements/10000000-0000-4000-8000-000000000001");
     expect(sanitizeNotificationDestination("/family/movements/10000000-0000-4000-8000-000000000001")).toBe("/family/movements/10000000-0000-4000-8000-000000000001");
+    expect(sanitizeNotificationDestination("/family/movement-requests/10000000-0000-4000-8000-000000000001")).toBe("/family/movement-requests/10000000-0000-4000-8000-000000000001");
   });
 
   it("rejects malformed destinations", () => {

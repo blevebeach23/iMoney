@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { movementFormSchema, parseContainerId } from "@/lib/movements/validation";
+import { movementFormSchema, movementRequestDecisionSchema, movementRequestFormSchema, parseContainerId } from "@/lib/movements/validation";
 
 const categoryId = "11111111-1111-4111-8111-111111111111";
 const accountId = "22222222-2222-4222-8222-222222222222";
@@ -57,5 +57,49 @@ describe("movement validation", () => {
   it("parses the unified account/fund selector", () => {
     expect(parseContainerId(`account:${accountId}`)).toEqual({ accountId, fundId: null });
     expect(parseContainerId(`fund:${accountId}`)).toEqual({ accountId: null, fundId: accountId });
+  });
+
+  it("validates movement requests without exposing recipient containers", () => {
+    const parsed = movementRequestFormSchema.parse({
+      occurredOn: "2026-09-15",
+      description: "Spesa per Anna",
+      categoryId,
+      categoryLabel: "Casa / Spesa",
+      type: "expense",
+      amount: "45,00",
+      isReimbursement: false,
+      reimbursementForMovementId: "",
+      sharedWithFamily: true,
+      householdId,
+      recipientUserId: "44444444-4444-4444-8444-444444444444",
+      notes: "Da confermare"
+    });
+
+    expect(parsed.amount).toBe("45.00");
+    expect(parsed).not.toHaveProperty("accountId");
+    expect(parsed).not.toHaveProperty("fundId");
+  });
+
+  it("requires recipient container and category when accepting a movement request", () => {
+    expect(
+      movementRequestDecisionSchema.safeParse({
+        requestId: "55555555-5555-4555-8555-555555555555",
+        categoryId,
+        containerId: `account:${accountId}`,
+        accountId,
+        fundId: null,
+        reimbursementForMovementId: ""
+      }).success
+    ).toBe(true);
+    expect(
+      movementRequestDecisionSchema.safeParse({
+        requestId: "55555555-5555-4555-8555-555555555555",
+        categoryId,
+        containerId: "",
+        accountId: null,
+        fundId: null,
+        reimbursementForMovementId: ""
+      }).success
+    ).toBe(false);
   });
 });

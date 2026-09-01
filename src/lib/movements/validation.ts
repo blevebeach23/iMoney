@@ -61,6 +61,62 @@ export const movementFormSchema = z
 
 export type MovementFormInput = z.infer<typeof movementFormSchema>;
 
+export const movementRequestFormSchema = z
+  .object({
+    occurredOn: z.string().trim().min(1, "Data obbligatoria"),
+    description: z.string().trim().min(1, "Descrizione obbligatoria").max(160, "Descrizione troppo lunga"),
+    categoryId: z
+      .string()
+      .trim()
+      .transform((value) => (value === "" ? null : value))
+      .pipe(z.string().uuid().nullable()),
+    categoryLabel: z.string().trim().max(160, "Categoria troppo lunga").nullable(),
+    type: z.enum(["income", "expense"]),
+    amount: z
+      .string()
+      .trim()
+      .min(1, "Importo obbligatorio")
+      .regex(/^\d+([.,]\d{1,2})?$/, "Importo positivo con massimo due decimali")
+      .transform((value) => value.replace(",", "."))
+      .refine((value) => Number(value) > 0, "Importo deve essere maggiore di zero"),
+    isReimbursement: z.boolean(),
+    reimbursementForMovementId: z
+      .string()
+      .trim()
+      .transform((value) => (value === "" ? null : value))
+      .pipe(z.string().uuid().nullable()),
+    sharedWithFamily: z.boolean(),
+    householdId: z.string().uuid("Serve una famiglia attiva"),
+    recipientUserId: z.string().uuid("Destinatario obbligatorio"),
+    notes: z.string().trim().max(1000, "Note troppo lunghe").default("")
+  })
+  .refine((value) => !value.isReimbursement || value.type === "income", {
+    message: "Un rimborso deve essere una entrata",
+    path: ["type"]
+  })
+  .refine((value) => value.sharedWithFamily, {
+    message: "Una richiesta familiare deve restare condivisa con famiglia",
+    path: ["sharedWithFamily"]
+  });
+
+export const movementRequestDecisionSchema = z
+  .object({
+    requestId: z.string().uuid(),
+    categoryId: z.string().uuid("Categoria obbligatoria"),
+    containerId: z.string().min(1, "Conto o fondo obbligatorio"),
+    accountId: z.string().uuid().nullable(),
+    fundId: z.string().uuid().nullable(),
+    reimbursementForMovementId: z
+      .string()
+      .trim()
+      .transform((value) => (value === "" ? null : value))
+      .pipe(z.string().uuid().nullable())
+  })
+  .and(containerSchema);
+
+export type MovementRequestFormInput = z.infer<typeof movementRequestFormSchema>;
+export type MovementRequestDecisionInput = z.infer<typeof movementRequestDecisionSchema>;
+
 export function parseContainerId(value: string): { accountId: string | null; fundId: string | null } {
   const [kind, id] = value.split(":");
 

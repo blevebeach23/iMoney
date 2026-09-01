@@ -304,7 +304,7 @@ export async function notifyFamilyEvent(
   });
 }
 
-async function deliverPushForNotifications(notificationIds: string[]) {
+export async function deliverPushForNotifications(notificationIds: string[]) {
   if (notificationIds.length === 0) {
     return;
   }
@@ -327,6 +327,145 @@ async function deliverPushForNotifications(notificationIds: string[]) {
   for (const notification of (notifications ?? []).map(mapNotificationRow)) {
     await deliverPushForNotification(admin, notification);
   }
+}
+
+export async function notifyMovementRequestCreated(
+  supabase: SupabaseClient,
+  input: { amount: string; householdId: string; id: string; recipientUserId: string },
+  actorUserId: string
+) {
+  const actor = await getNotificationActor(supabase, actorUserId);
+  const notificationId = await createDirectNotification(supabase, {
+    body: `${actor.displayName} ha inserito un movimento per tuo conto di ${formatEuro(input.amount)}.`,
+    dedupeScope: `movement_request:${input.id}:created`,
+    destinationUrl: `/family/movement-requests/${input.id}`,
+    entityId: input.id,
+    entityType: "movement_request",
+    householdId: input.householdId,
+    metadata: {},
+    recipientUserId: input.recipientUserId,
+    title: "Movimento da approvare",
+    type: "movement_request_created"
+  });
+
+  return notificationId ? [notificationId] : [];
+}
+
+export async function notifyMovementRequestAccepted(
+  supabase: SupabaseClient,
+  input: { acceptedMovementId: string | null; amount: string; creatorUserId: string; householdId: string; id: string; sharedWithFamily: boolean },
+  actorUserId: string
+) {
+  const actor = await getNotificationActor(supabase, actorUserId);
+  const destinationUrl = input.acceptedMovementId && input.sharedWithFamily ? `/family/movements/${input.acceptedMovementId}` : `/family/movement-requests/${input.id}`;
+  const notificationId = await createDirectNotification(supabase, {
+    body: `${actor.displayName} ha accettato il movimento di ${formatEuro(input.amount)}.`,
+    dedupeScope: `movement_request:${input.id}:accepted`,
+    destinationUrl,
+    entityId: input.id,
+    entityType: "movement_request",
+    householdId: input.householdId,
+    metadata: {
+      acceptedMovementId: input.acceptedMovementId,
+      sharedWithFamily: input.sharedWithFamily
+    },
+    recipientUserId: input.creatorUserId,
+    title: "Movimento accettato",
+    type: "movement_request_accepted"
+  });
+
+  return notificationId ? [notificationId] : [];
+}
+
+export async function notifyMovementRequestRejected(
+  supabase: SupabaseClient,
+  input: { amount: string; creatorUserId: string; householdId: string; id: string },
+  actorUserId: string
+) {
+  const actor = await getNotificationActor(supabase, actorUserId);
+  const notificationId = await createDirectNotification(supabase, {
+    body: `${actor.displayName} ha rifiutato il movimento di ${formatEuro(input.amount)}.`,
+    dedupeScope: `movement_request:${input.id}:rejected`,
+    destinationUrl: `/family/movement-requests/${input.id}`,
+    entityId: input.id,
+    entityType: "movement_request",
+    householdId: input.householdId,
+    metadata: {},
+    recipientUserId: input.creatorUserId,
+    title: "Movimento rifiutato",
+    type: "movement_request_rejected"
+  });
+
+  return notificationId ? [notificationId] : [];
+}
+
+export async function notifyMovementRequestCancelled(
+  supabase: SupabaseClient,
+  input: { householdId: string; id: string; recipientUserId: string },
+  actorUserId: string
+) {
+  const actor = await getNotificationActor(supabase, actorUserId);
+  const notificationId = await createDirectNotification(supabase, {
+    body: `${actor.displayName} ha annullato una richiesta di movimento.`,
+    dedupeScope: `movement_request:${input.id}:cancelled`,
+    destinationUrl: `/family/movement-requests/${input.id}`,
+    entityId: input.id,
+    entityType: "movement_request",
+    householdId: input.householdId,
+    metadata: {},
+    recipientUserId: input.recipientUserId,
+    title: "Richiesta annullata",
+    type: "movement_request_cancelled"
+  });
+
+  return notificationId ? [notificationId] : [];
+}
+
+async function createDirectNotification(
+  supabase: SupabaseClient,
+  input: {
+    body: string;
+    dedupeScope: string;
+    destinationUrl: string;
+    entityId: string;
+    entityType: string;
+    householdId: string;
+    metadata: Record<string, unknown>;
+    recipientUserId: string;
+    title: string;
+    type: NotificationType;
+  }
+) {
+  const { data, error } = await supabase.rpc("create_direct_notification", {
+    target_recipient_user_id: input.recipientUserId,
+    target_household_id: input.householdId,
+    notification_type: input.type,
+    notification_title: input.title,
+    notification_body: input.body,
+    entity_type: input.entityType,
+    entity_id: input.entityId,
+    destination_url: input.destinationUrl,
+    notification_metadata: input.metadata,
+    dedupe_scope: input.dedupeScope
+  });
+
+  if (error) {
+    console.error("[notifications] Direct notification creation failed", {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint
+    });
+    return null;
+  }
+
+  const notificationId = typeof data === "string" ? data : null;
+
+  if (notificationId) {
+    await deliverPushForNotifications([notificationId]);
+  }
+
+  return notificationId;
 }
 
 async function deliverPushForNotification(admin: SupabaseClient, notification: AppNotification) {

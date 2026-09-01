@@ -31,15 +31,15 @@ describe("notification and push configuration", () => {
     expect(serviceWorker).toContain("/icons/icon-192.png");
   });
 
-  it("forces every notificationclick to open the notification center", () => {
+  it("opens notificationclick targets from safe same-origin payload urls", () => {
     const serviceWorker = readFileSync(join(root, "public", "sw.js"), "utf8");
     const clickHandler = serviceWorker.slice(serviceWorker.indexOf("self.addEventListener(\"notificationclick\""));
 
-    expect(clickHandler).toContain("const targetUrl = notificationCenterUrl()");
-    expect(clickHandler).toContain("forcedPath: \"/notifications\"");
+    expect(serviceWorker).toContain("function notificationTargetUrl(data)");
+    expect(serviceWorker).toContain("url.origin === self.location.origin ? url.toString() : notificationCenterUrl()");
+    expect(clickHandler).toContain("const targetUrl = notificationTargetUrl(event.notification.data)");
     expect(clickHandler).toContain("client.navigate(targetUrl)");
     expect(clickHandler).toContain("clients.openWindow(targetUrl)");
-    expect(clickHandler).not.toContain("event.notification.data?.url");
     expect(clickHandler).not.toContain("destination_url");
     expect(clickHandler).not.toContain("entity_type");
     expect(clickHandler).not.toContain("entity_id");
@@ -49,7 +49,7 @@ describe("notification and push configuration", () => {
   it("versions the service worker cache so old notificationclick handlers are replaced", () => {
     const serviceWorker = readFileSync(join(root, "public", "sw.js"), "utf8");
 
-    expect(serviceWorker).toContain("const CACHE_NAME = \"imoney-v2-notification-click\"");
+    expect(serviceWorker).toContain("const CACHE_NAME = \"imoney-v3-notification-routes\"");
     expect(serviceWorker).toContain("self.skipWaiting()");
     expect(serviceWorker).toContain("self.clients.claim()");
     expect(serviceWorker).toContain("keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))");

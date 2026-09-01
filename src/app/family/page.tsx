@@ -12,6 +12,7 @@ import { getHouseholdBudgetsForMonth } from "@/services/budgets/budget-service";
 import { getSharedHouseholdFunds } from "@/services/funds/fund-service";
 import { getMovementCategoryInfo, getSharedHouseholdMovements, getSharedHouseholdMovementsBetween } from "@/services/movements/movement-service";
 import { getActiveHouseholds, getHouseholdById } from "@/services/households/household-service";
+import { getMovementRequestsForHousehold } from "@/services/movements/movement-request-service";
 
 export const dynamic = "force-dynamic";
 
@@ -53,13 +54,14 @@ export default async function FamilyPage({ searchParams }: Readonly<{ searchPara
   const selectedMonth = firstParam(searchParams.month) ?? formatYearMonth(new Date());
   const range = monthRangeFromYearMonth(selectedMonth);
   const year = Number(range.yearMonth.slice(0, 4));
-  const [household, monthMovements, yearMovements, budgets, categoryInfo, sharedFunds] = await Promise.all([
+  const [household, monthMovements, yearMovements, budgets, categoryInfo, sharedFunds, movementRequests] = await Promise.all([
     getHouseholdById(supabase, selectedHouseholdId),
     getSharedHouseholdMovements(supabase, selectedHouseholdId, range.monthStart, range.monthEnd),
     getSharedHouseholdMovementsBetween(supabase, selectedHouseholdId, `${year}-01-01`, `${year}-12-31`),
     getHouseholdBudgetsForMonth(supabase, selectedHouseholdId, range.monthStart),
     getMovementCategoryInfo(supabase, user.id),
-    getSharedHouseholdFunds(supabase, selectedHouseholdId)
+    getSharedHouseholdFunds(supabase, selectedHouseholdId),
+    getMovementRequestsForHousehold(supabase, selectedHouseholdId)
   ]);
 
   if (!household) {
@@ -77,10 +79,12 @@ export default async function FamilyPage({ searchParams }: Readonly<{ searchPara
     <FamilyDashboard
       annualTrend={annualTrend}
       budgetReport={budgetReport}
+      currentUserId={user.id}
       householdId={selectedHouseholdId}
       householdName={household.name}
       macroCategoryAggregates={aggregates.macroCategories}
       monthLabel={formatMonthLabel(range.monthStart)}
+      movementRequests={movementRequests}
       selectedMonth={range.yearMonth}
       sharedFunds={sharedFunds}
       summary={summary}

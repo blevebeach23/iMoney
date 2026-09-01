@@ -1,4 +1,4 @@
-const CACHE_NAME = "imoney-v2-notification-click";
+const CACHE_NAME = "imoney-v3-notification-routes";
 const OFFLINE_URL = "/offline.html";
 const STATIC_ASSETS = ["/manifest.webmanifest", "/favicon.ico", "/icons/favicon-32.png", "/icons/icon-192.png", "/icons/icon-512.png", "/icons/apple-touch-icon.png", "/offline.html"];
 const EXCLUDED_PATH_PREFIXES = ["/api/", "/auth/", "/_next/"];
@@ -132,13 +132,22 @@ function notificationCenterUrl() {
   return new URL("/notifications", self.location.origin).toString();
 }
 
+function notificationTargetUrl(data) {
+  try {
+    const path = data && typeof data.url === "string" ? data.url : "/notifications";
+    const url = new URL(path, self.location.origin);
+    return url.origin === self.location.origin ? url.toString() : notificationCenterUrl();
+  } catch {
+    return notificationCenterUrl();
+  }
+}
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const targetUrl = notificationCenterUrl();
+  const targetUrl = notificationTargetUrl(event.notification.data);
 
   console.info("[sw] notification click", {
     data: event.notification.data || null,
-    forcedPath: "/notifications",
     targetUrl
   });
 
