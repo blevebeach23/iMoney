@@ -23,9 +23,9 @@ function notification(partial: Partial<AppNotification> = {}): AppNotification {
 }
 
 describe("notification route mapping", () => {
-  it("opens shared movement push notifications on an existing movement detail route", () => {
+  it("opens shared movement push notifications on the family movement detail route", () => {
     expect(resolveNotificationDestination(notification({ entityType: "movement", entityId: "10000000-0000-4000-8000-000000000001" }))).toBe(
-      "/movements/10000000-0000-4000-8000-000000000001"
+      "/family/movements/10000000-0000-4000-8000-000000000001"
     );
   });
 
@@ -79,7 +79,9 @@ describe("notification route mapping", () => {
     expect(sanitizeNotificationDestination("https://evil.example/movements/1")).toBe("/notifications");
     expect(sanitizeNotificationDestination("/movement/movement-1")).toBe("/notifications");
     expect(sanitizeNotificationDestination("/movements/movement-1")).toBe("/notifications");
+    expect(sanitizeNotificationDestination("/family/movements/movement-1")).toBe("/notifications");
     expect(sanitizeNotificationDestination("/movements/10000000-0000-4000-8000-000000000001")).toBe("/movements/10000000-0000-4000-8000-000000000001");
+    expect(sanitizeNotificationDestination("/family/movements/10000000-0000-4000-8000-000000000001")).toBe("/family/movements/10000000-0000-4000-8000-000000000001");
   });
 
   it("rejects malformed destinations", () => {

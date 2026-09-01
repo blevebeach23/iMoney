@@ -243,6 +243,22 @@ export async function getMovementById(supabase: SupabaseClient, userId: string, 
   return data ? stripRawCategory(mapMovementListRow(data)) : null;
 }
 
+export async function getSharedHouseholdMovementById(supabase: SupabaseClient, movementId: string): Promise<MovementListItem | null> {
+  const { data, error } = await supabase
+    .from("movements")
+    .select("*, categories(name, macro_categories(id, name)), accounts(name), funds(name), profiles!movements_owner_user_id_fkey(full_name)")
+    .eq("id", movementId)
+    .eq("shared_with_family", true)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data ? stripRawCategory(mapMovementListRow(data)) : null;
+}
+
 export async function createMovement(supabase: SupabaseClient, userId: string, input: MovementFormInput) {
   const { data, error } = await supabase
     .from("movements")

@@ -72,7 +72,7 @@ describe("notification service", () => {
       notification_type: "movement_shared_created",
       notification_title: "Nuovo movimento condiviso",
       notification_body: "Vito ha aggiunto un movimento condiviso di € 52,00.",
-      destination_url: "/movements/10000000-0000-4000-8000-000000000001",
+      destination_url: "/family/movements/10000000-0000-4000-8000-000000000001",
       dedupe_scope: "movement:10000000-0000-4000-8000-000000000001:created"
     }));
   });

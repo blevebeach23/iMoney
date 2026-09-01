@@ -220,7 +220,7 @@ export async function notifySharedMovement(
     body,
     entityType: "movement",
     entityId: movement.id,
-    destinationUrl: action === "deleted" ? "/notifications" : `/movements/${movement.id}`,
+    destinationUrl: action === "deleted" ? "/notifications" : `/family/movements/${movement.id}`,
     dedupeScope: `movement:${movement.id}:${action}`
   });
 }

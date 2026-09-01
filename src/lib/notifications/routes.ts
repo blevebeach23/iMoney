@@ -13,7 +13,7 @@ export function resolveNotificationDestination(notification: NotificationDestina
   }
 
   if (notification.entityType === "movement" && entityId) {
-    return `/movements/${entityId}`;
+    return `/family/movements/${entityId}`;
   }
 
   if (notification.entityType === "transfer" && entityId) {
@@ -83,6 +83,7 @@ function isKnownNotificationRoute(pathname: string) {
   return (
     pathname === NOTIFICATION_FALLBACK_URL ||
     pathname === "/family" ||
+    /^\/family\/movements\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pathname) ||
     /^\/movements\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pathname) ||
     /^\/transfers\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pathname) ||
     /^\/funds\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pathname) ||

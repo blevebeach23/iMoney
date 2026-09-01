@@ -113,7 +113,7 @@ export function FamilyDashboard({
           <p className="rounded-md border border-dashed border-border bg-white p-4 text-sm text-zinc-600">Nessun movimento condiviso.</p>
         ) : (
           timeline.map((movement) => (
-            <Link key={movement.id} href={`/movements/${movement.id}`} className="block rounded-md border border-border bg-white p-4 shadow-panel">
+            <Link key={movement.id} href={`/family/movements/${movement.id}`} className="block rounded-md border border-border bg-white p-4 shadow-panel">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-zinc-500">{formatDate(movement.occurredOn)}</p>
