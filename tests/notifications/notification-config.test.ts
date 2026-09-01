@@ -77,19 +77,21 @@ describe("notification and push configuration", () => {
     expect(service).toContain("return []");
   });
 
-  it("updates the top-right unread badge from notification read events without a full reload", () => {
+  it("updates the top-right unread badge from the shared realtime notification provider", () => {
     const topRightActions = readFileSync(join(root, "src", "components", "layout", "top-right-actions.tsx"), "utf8");
+    const provider = readFileSync(join(root, "src", "components", "notifications", "notification-provider.tsx"), "utf8");
     const notificationActions = readFileSync(join(root, "src", "components", "notifications", "notification-actions.tsx"), "utf8");
 
-    expect(topRightActions).toContain("NOTIFICATION_UNREAD_COUNT_CHANGED");
-    expect(topRightActions).toContain("NOTIFICATION_RECEIVED_FROM_SERVICE_WORKER");
-    expect(topRightActions).toContain("setUnreadCount(detail.count)");
-    expect(topRightActions).toContain("updatePwaAppBadge(nextUnreadCount)");
-    expect(topRightActions).toContain("navigator.serviceWorker?.addEventListener(\"message\"");
+    expect(topRightActions).toContain("useNotifications()");
+    expect(provider).toContain("NOTIFICATION_UNREAD_COUNT_CHANGED");
+    expect(provider).toContain("NOTIFICATION_RECEIVED_FROM_SERVICE_WORKER");
+    expect(provider).toContain("filter: `recipient_user_id=eq.${userId}`");
+    expect(provider).toContain("supabase.auth.onAuthStateChange");
+    expect(provider).toContain("updatePwaAppBadge(nextCount)");
+    expect(provider).toContain("navigator.serviceWorker?.addEventListener(\"message\"");
     expect(notificationActions).toContain("AutoMarkDisplayedNotificationsRead");
     expect(notificationActions).toContain("markDisplayedNotificationsReadAction(notificationIds)");
-    expect(notificationActions).toContain("emitNotificationUnreadCountChanged(result.unreadCount)");
-    expect(notificationActions).toContain("router.refresh()");
+    expect(notificationActions).not.toContain("router.refresh()");
   });
 
   it("uses the Badging API with feature detection and keeps unsupported browsers safe", () => {
@@ -103,10 +105,12 @@ describe("notification and push configuration", () => {
 
   it("marks displayed notifications as read automatically and removes manual read controls", () => {
     const page = readFileSync(join(root, "src", "app", "notifications", "page.tsx"), "utf8");
+    const center = readFileSync(join(root, "src", "components", "notifications", "notification-center.tsx"), "utf8");
     const actions = readFileSync(join(root, "src", "lib", "notifications", "actions.ts"), "utf8");
 
-    expect(page).toContain("AutoMarkDisplayedNotificationsRead");
-    expect(page).toContain("unreadNotificationIds");
+    expect(page).toContain("NotificationCenter");
+    expect(center).toContain("AutoMarkDisplayedNotificationsRead");
+    expect(center).toContain("unreadNotificationIds");
     expect(page).not.toContain("Segna come letta");
     expect(page).not.toContain("Segna tutte come lette");
     expect(actions).toContain("markNotificationsRead(supabase, user.id, ids)");

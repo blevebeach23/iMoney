@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AppChrome } from "@/components/layout/app-chrome";
 import { PwaRegister } from "@/components/layout/pwa-register";
+import { NotificationProvider } from "@/components/notifications/notification-provider";
 
 export const metadata: Metadata = {
   applicationName: "iMoney",
@@ -43,7 +44,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="it">
       <body>
         <PwaRegister />
-        <AppChrome>{children}</AppChrome>
+        <NotificationProvider>
+          <AppChrome>{children}</AppChrome>
+        </NotificationProvider>
       </body>
     </html>
   );
