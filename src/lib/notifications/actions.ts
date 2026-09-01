@@ -48,12 +48,20 @@ export async function savePushSubscriptionAction(payload: unknown) {
   }
 
   const { supabase, user } = await requireUser();
-  await savePushSubscription(supabase, user.id, {
-    endpoint: parsed.data.endpoint,
-    auth: parsed.data.keys.auth,
-    p256dh: parsed.data.keys.p256dh,
-    userAgent: parsed.data.userAgent ?? null
-  });
+  try {
+    await savePushSubscription(supabase, user.id, {
+      endpoint: parsed.data.endpoint,
+      auth: parsed.data.keys.auth,
+      p256dh: parsed.data.keys.p256dh,
+      userAgent: parsed.data.userAgent ?? null
+    });
+  } catch (error) {
+    console.error("[push] Subscription save failed", {
+      message: error instanceof Error ? error.message : String(error)
+    });
+    return { ok: false, message: "Impossibile attivare le notifiche push. Riprova tra poco." };
+  }
+
   revalidatePath("/settings/profile");
   return { ok: true, message: "Notifiche push attive." };
 }

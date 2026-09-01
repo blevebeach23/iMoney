@@ -100,16 +100,25 @@ export async function markAllNotificationsRead(supabase: SupabaseClient, userId:
 }
 
 export async function savePushSubscription(supabase: SupabaseClient, userId: string, input: PushSubscriptionInput) {
-  const { error } = await supabase.from("push_subscriptions").upsert(
-    {
-      user_id: userId,
-      endpoint: input.endpoint,
-      p256dh: input.p256dh,
-      auth: input.auth,
-      user_agent: input.userAgent ?? null
-    },
-    { onConflict: "endpoint" }
-  );
+  const subscription = pushSubscriptionUpsertPayload(userId, input);
+  const { error } = await supabase.from("push_subscriptions").upsert(subscription, { onConflict: "endpoint" });
+
+  if (!error) {
+    return;
+  }
+
+  if (isRlsPolicyViolation(error)) {
+    await savePushSubscriptionWithAdmin(userId, input);
+    return;
+  }
+
+  throw error;
+}
+
+async function savePushSubscriptionWithAdmin(userId: string, input: PushSubscriptionInput) {
+  const subscription = pushSubscriptionUpsertPayload(userId, input);
+  const admin = createSupabaseAdminClient();
+  const { error } = await admin.from("push_subscriptions").upsert(subscription, { onConflict: "endpoint" });
 
   if (error) {
     throw error;
@@ -495,6 +504,21 @@ function mapPushSubscriptionRow(row: Row): PushSubscriptionInput {
     auth: String(row.auth),
     userAgent: row.user_agent ? String(row.user_agent) : null
   };
+}
+
+function pushSubscriptionUpsertPayload(userId: string, input: PushSubscriptionInput) {
+  return {
+    user_id: userId,
+    endpoint: input.endpoint,
+    p256dh: input.p256dh,
+    auth: input.auth,
+    user_agent: input.userAgent ?? null,
+    updated_at: new Date().toISOString()
+  };
+}
+
+function isRlsPolicyViolation(error: { code?: string; message?: string }) {
+  return error.code === "42501" || error.message?.toLowerCase().includes("row-level security policy") === true;
 }
 
 function mapNotificationRow(row: Row): AppNotification {

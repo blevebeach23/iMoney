@@ -16,6 +16,20 @@ describe("notification and push configuration", () => {
     expect(migration).toContain("on conflict (dedupe_key)");
   });
 
+  it("keeps push subscription RLS scoped to the authenticated owner", () => {
+    const migration = readFileSync(join(root, "supabase", "migrations", "027_notifications_and_push.sql"), "utf8");
+
+    expect(migration).toContain("create policy push_subscriptions_select_own on public.push_subscriptions");
+    expect(migration).toContain("for select using (user_id = auth.uid())");
+    expect(migration).toContain("create policy push_subscriptions_insert_own on public.push_subscriptions");
+    expect(migration).toContain("for insert with check (user_id = auth.uid())");
+    expect(migration).toContain("create policy push_subscriptions_update_own on public.push_subscriptions");
+    expect(migration).toContain("for update using (user_id = auth.uid()) with check (user_id = auth.uid())");
+    expect(migration).toContain("create policy push_subscriptions_delete_own on public.push_subscriptions");
+    expect(migration).toContain("for delete using (user_id = auth.uid())");
+    expect(migration).toContain("endpoint text not null unique");
+  });
+
   it("adds push and notification click handlers to the service worker", () => {
     const serviceWorker = readFileSync(join(root, "public", "sw.js"), "utf8");
 
@@ -75,6 +89,22 @@ describe("notification and push configuration", () => {
     expect(service).toContain("result === \"gone\"");
     expect(service).toContain(".delete().eq(\"endpoint\"");
     expect(service).toContain("return []");
+  });
+
+  it("saves PWA subscriptions through the server action without returning a 500 on RLS upsert conflicts", () => {
+    const actions = readFileSync(join(root, "src", "lib", "notifications", "actions.ts"), "utf8");
+    const service = readFileSync(join(root, "src", "services", "notifications", "notification-service.ts"), "utf8");
+    const pushSettings = readFileSync(join(root, "src", "components", "notifications", "push-settings.tsx"), "utf8");
+
+    expect(actions).toContain("const { supabase, user } = await requireUser()");
+    expect(actions).toContain("await savePushSubscription(supabase, user.id");
+    expect(actions).toContain("catch (error)");
+    expect(actions).toContain("return { ok: false, message: \"Impossibile attivare le notifiche push. Riprova tra poco.\" }");
+    expect(service).toContain("isRlsPolicyViolation(error)");
+    expect(service).toContain("savePushSubscriptionWithAdmin(userId, input)");
+    expect(service).toContain("createSupabaseAdminClient()");
+    expect(pushSettings).toContain("registration.pushManager.getSubscription()");
+    expect(pushSettings).toContain("existingSubscription ??");
   });
 
   it("updates the top-right unread badge from the shared realtime notification provider", () => {

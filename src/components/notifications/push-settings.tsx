@@ -89,10 +89,13 @@ export function PushSettings({ activeSubscriptionCount, vapidPublicKey }: Readon
       }
 
       const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
-      });
+      const existingSubscription = await registration.pushManager.getSubscription();
+      const subscription =
+        existingSubscription ??
+        (await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
+        }));
       const result = await savePushSubscriptionAction({
         ...subscription.toJSON(),
         userAgent: navigator.userAgent
