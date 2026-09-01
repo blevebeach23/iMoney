@@ -68,6 +68,9 @@ function notificationTypeLabel(type: string) {
   if (type.startsWith("movement_")) {
     return "Movimenti";
   }
+  if (type.startsWith("fixed_expense_")) {
+    return "Spese fisse";
+  }
   if (type.startsWith("budget_")) {
     return "Budget";
   }

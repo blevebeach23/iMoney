@@ -383,6 +383,94 @@ export async function notifyMovementRequestCreated(
   return notificationId ? [notificationId] : [];
 }
 
+export async function notifyFixedExpenseRequestCreated(
+  supabase: SupabaseClient,
+  input: { amount: string; householdId: string; id: string; recipientUserId: string },
+  actorUserId: string
+) {
+  const actor = await getNotificationActor(supabase, actorUserId);
+  const notificationId = await createDirectNotification(supabase, {
+    body: `${actor.displayName} ha proposto una spesa fissa per tuo conto di ${formatEuro(input.amount)}.`,
+    dedupeScope: `fixed_expense_request:${input.id}:created`,
+    destinationUrl: `/family/fixed-expense-requests/${input.id}`,
+    entityId: input.id,
+    entityType: "fixed_expense_request",
+    householdId: input.householdId,
+    metadata: {},
+    recipientUserId: input.recipientUserId,
+    title: "Spesa fissa da approvare",
+    type: "fixed_expense_request_created"
+  });
+
+  return notificationId ? [notificationId] : [];
+}
+
+export async function notifyFixedExpenseRequestAccepted(
+  supabase: SupabaseClient,
+  input: { acceptedFixedExpenseId: string | null; amount: string; creatorUserId: string; householdId: string; id: string },
+  actorUserId: string
+) {
+  const actor = await getNotificationActor(supabase, actorUserId);
+  const notificationId = await createDirectNotification(supabase, {
+    body: `${actor.displayName} ha accettato la spesa fissa di ${formatEuro(input.amount)}.`,
+    dedupeScope: `fixed_expense_request:${input.id}:accepted`,
+    destinationUrl: `/family/fixed-expense-requests/${input.id}`,
+    entityId: input.id,
+    entityType: "fixed_expense_request",
+    householdId: input.householdId,
+    metadata: { acceptedFixedExpenseId: input.acceptedFixedExpenseId },
+    recipientUserId: input.creatorUserId,
+    title: "Spesa fissa accettata",
+    type: "fixed_expense_request_accepted"
+  });
+
+  return notificationId ? [notificationId] : [];
+}
+
+export async function notifyFixedExpenseRequestRejected(
+  supabase: SupabaseClient,
+  input: { amount: string; creatorUserId: string; householdId: string; id: string },
+  actorUserId: string
+) {
+  const actor = await getNotificationActor(supabase, actorUserId);
+  const notificationId = await createDirectNotification(supabase, {
+    body: `${actor.displayName} ha rifiutato la spesa fissa di ${formatEuro(input.amount)}.`,
+    dedupeScope: `fixed_expense_request:${input.id}:rejected`,
+    destinationUrl: `/family/fixed-expense-requests/${input.id}`,
+    entityId: input.id,
+    entityType: "fixed_expense_request",
+    householdId: input.householdId,
+    metadata: {},
+    recipientUserId: input.creatorUserId,
+    title: "Spesa fissa rifiutata",
+    type: "fixed_expense_request_rejected"
+  });
+
+  return notificationId ? [notificationId] : [];
+}
+
+export async function notifyFixedExpenseRequestCancelled(
+  supabase: SupabaseClient,
+  input: { householdId: string; id: string; recipientUserId: string },
+  actorUserId: string
+) {
+  const actor = await getNotificationActor(supabase, actorUserId);
+  const notificationId = await createDirectNotification(supabase, {
+    body: `${actor.displayName} ha annullato una richiesta di spesa fissa.`,
+    dedupeScope: `fixed_expense_request:${input.id}:cancelled`,
+    destinationUrl: `/family/fixed-expense-requests/${input.id}`,
+    entityId: input.id,
+    entityType: "fixed_expense_request",
+    householdId: input.householdId,
+    metadata: {},
+    recipientUserId: input.recipientUserId,
+    title: "Richiesta annullata",
+    type: "fixed_expense_request_cancelled"
+  });
+
+  return notificationId ? [notificationId] : [];
+}
+
 export async function notifyMovementRequestAccepted(
   supabase: SupabaseClient,
   input: { acceptedMovementId: string | null; amount: string; creatorUserId: string; householdId: string; id: string; sharedWithFamily: boolean },

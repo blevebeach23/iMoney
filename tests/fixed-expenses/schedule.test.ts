@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { calculateFinancialBalances } from "@/lib/calculations/balances";
 import { calculateBudgetUsage } from "@/lib/calculations/budget";
+import { fixedExpenseRequestDecisionSchema, fixedExpenseRequestFormSchema } from "@/lib/fixed-expenses/validation";
 import { buildFixedExpenseOccurrences, excludeExistingOccurrences, isOccurrenceInDateRange, monthIsActive, occurrenceDateForMonth } from "@/lib/fixed-expenses/schedule";
 import { toFixedExpensePayload } from "@/services/fixed-expenses/fixed-expense-service";
 import type { Account, FixedExpense, Movement } from "@/types/domain";
@@ -140,5 +141,46 @@ describe("fixed expense scheduling", () => {
     expect(budget.used).toBe("200.00");
     expect(balances.bank[0]?.balance).toBe("1000.00");
     expect(balances.forecastMonthEnd[0]?.balance).toBe("800.00");
+  });
+
+  it("validates fixed expense requests without exposing recipient containers or category", () => {
+    const parsed = fixedExpenseRequestFormSchema.parse({
+      activeMonths: ["1", "2"],
+      amount: "45,00",
+      dayOfMonth: "10",
+      description: "Palestra",
+      endsOn: "",
+      householdId: "33333333-3333-4333-8333-333333333333",
+      notes: "Da confermare",
+      recipientUserId: "44444444-4444-4444-8444-444444444444",
+      sharedWithFamily: true,
+      startsOn: "2026-09-01"
+    });
+
+    expect(parsed.amount).toBe("45.00");
+    expect(parsed).not.toHaveProperty("accountId");
+    expect(parsed).not.toHaveProperty("fundId");
+    expect(parsed).not.toHaveProperty("categoryId");
+  });
+
+  it("requires recipient category and container when accepting a fixed expense request", () => {
+    expect(
+      fixedExpenseRequestDecisionSchema.safeParse({
+        accountId: "22222222-2222-4222-8222-222222222222",
+        categoryId: "11111111-1111-4111-8111-111111111111",
+        containerId: "account:22222222-2222-4222-8222-222222222222",
+        fundId: null,
+        requestId: "55555555-5555-4555-8555-555555555555"
+      }).success
+    ).toBe(true);
+    expect(
+      fixedExpenseRequestDecisionSchema.safeParse({
+        accountId: null,
+        categoryId: "11111111-1111-4111-8111-111111111111",
+        containerId: "",
+        fundId: null,
+        requestId: "55555555-5555-4555-8555-555555555555"
+      }).success
+    ).toBe(false);
   });
 });

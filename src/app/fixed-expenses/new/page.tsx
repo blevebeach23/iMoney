@@ -5,6 +5,7 @@ import { getAccounts } from "@/services/accounts/account-service";
 import { getCategoryTree } from "@/services/categories/category-service";
 import { getFunds } from "@/services/funds/fund-service";
 import { getActiveHouseholdOptions } from "@/services/households/household-service";
+import { getFixedExpenseRequestRecipientOptions } from "@/services/fixed-expenses/fixed-expense-request-service";
 
 export const dynamic = "force-dynamic";
 
@@ -18,11 +19,12 @@ export default async function NewFixedExpensePage() {
     redirect("/login");
   }
 
-  const [accounts, funds, categoryTree, households] = await Promise.all([
+  const [accounts, funds, categoryTree, households, requestRecipients] = await Promise.all([
     getAccounts(supabase, user.id),
     getFunds(supabase, user.id),
     getCategoryTree(supabase, user.id),
-    getActiveHouseholdOptions(supabase, user.id)
+    getActiveHouseholdOptions(supabase, user.id),
+    getFixedExpenseRequestRecipientOptions(supabase, user.id)
   ]);
 
   return (
@@ -31,7 +33,7 @@ export default async function NewFixedExpensePage() {
         <p className="text-sm font-semibold text-primary">Spese fisse</p>
         <h1 className="mt-2 text-3xl font-bold tracking-normal text-foreground">Nuova spesa fissa</h1>
       </header>
-      <FixedExpenseForm accounts={accounts} categoryTree={categoryTree} funds={funds} households={households} />
+      <FixedExpenseForm accounts={accounts} categoryTree={categoryTree} funds={funds} households={households} requestRecipients={requestRecipients} />
     </main>
   );
 }

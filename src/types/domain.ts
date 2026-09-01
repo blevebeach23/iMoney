@@ -2,6 +2,7 @@ export type MoneyAmount = string;
 
 export type MovementType = "income" | "expense" | "reimbursement";
 export type MovementRequestStatus = "PENDING" | "ACCEPTED" | "REJECTED" | "CANCELLED";
+export type FixedExpenseRequestStatus = "PENDING" | "ACCEPTED" | "REJECTED" | "CANCELLED";
 
 export type AccountType = "cash" | "bank" | "credit_card" | "other";
 
@@ -96,6 +97,27 @@ export interface MovementRequest {
   reimbursementForMovementId: string | null;
   status: MovementRequestStatus;
   acceptedMovementId: string | null;
+  createdAt: string;
+  respondedAt: string | null;
+}
+
+export interface FixedExpenseRequest {
+  id: string;
+  householdId: string;
+  createdByUserId: string;
+  creatorName: string;
+  recipientUserId: string;
+  recipientName: string;
+  description: string;
+  amount: MoneyAmount;
+  startsOn: string;
+  endsOn: string | null;
+  dayOfMonth: number;
+  activeMonths: number[];
+  notes: string;
+  sharedWithFamily: boolean;
+  status: FixedExpenseRequestStatus;
+  acceptedFixedExpenseId: string | null;
   createdAt: string;
   respondedAt: string | null;
 }

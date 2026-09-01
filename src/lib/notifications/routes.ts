@@ -32,6 +32,10 @@ export function resolveNotificationDestination(notification: NotificationDestina
     return `/family/movement-requests/${entityId}`;
   }
 
+  if (notification.entityType === "fixed_expense_request" && entityId) {
+    return `/family/fixed-expense-requests/${entityId}`;
+  }
+
   if (notification.entityType === "transfer" && entityId) {
     return `/transfers/${entityId}`;
   }
@@ -101,6 +105,7 @@ function isKnownNotificationRoute(pathname: string) {
     pathname === "/family" ||
     /^\/family\/movements\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pathname) ||
     /^\/family\/movement-requests\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pathname) ||
+    /^\/family\/fixed-expense-requests\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pathname) ||
     /^\/movements\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pathname) ||
     /^\/transfers\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pathname) ||
     /^\/funds\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pathname) ||
