@@ -1,4 +1,4 @@
-const CACHE_NAME = "imoney-v1-online-first";
+const CACHE_NAME = "imoney-v2-notification-click";
 const OFFLINE_URL = "/offline.html";
 const STATIC_ASSETS = ["/manifest.webmanifest", "/favicon.ico", "/icons/favicon-32.png", "/icons/icon-192.png", "/icons/icon-512.png", "/icons/apple-touch-icon.png", "/offline.html"];
 const EXCLUDED_PATH_PREFIXES = ["/api/", "/auth/", "/_next/"];
@@ -128,55 +128,17 @@ self.addEventListener("push", (event) => {
   );
 });
 
-function normalizeNotificationUrl(value) {
-  let fallbackApplied = false;
-  let normalizedPath = "/notifications";
-
-  try {
-    const url = new URL(value || "/notifications", self.location.origin);
-
-    if (url.origin === self.location.origin && isKnownNotificationRoute(url.pathname)) {
-      normalizedPath = url.pathname;
-      if (url.pathname.startsWith("/budgets/")) {
-        normalizedPath = `${url.pathname}${url.search}`;
-      }
-    } else {
-      fallbackApplied = true;
-    }
-  } catch {
-    fallbackApplied = true;
-  }
-
-  console.info("[sw] notification url normalized", {
-    originalUrl: value || null,
-    normalizedPath,
-    fallbackApplied
-  });
-
-  return normalizedPath;
-}
-
-function isKnownNotificationRoute(pathname) {
-  return (
-    pathname === "/notifications" ||
-    pathname === "/family" ||
-    /^\/movements\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pathname) ||
-    /^\/transfers\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pathname) ||
-    /^\/funds\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pathname) ||
-    /^\/budgets\/\d{4}\/\d{2}$/.test(pathname)
-  );
+function notificationCenterUrl() {
+  return new URL("/notifications", self.location.origin).toString();
 }
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const originalUrl = event.notification.data?.url;
-  const normalizedPath = normalizeNotificationUrl(originalUrl);
-  const targetUrl = new URL(normalizedPath, self.location.origin).toString();
+  const targetUrl = notificationCenterUrl();
 
   console.info("[sw] notification click", {
     data: event.notification.data || null,
-    originalUrl: originalUrl || null,
-    normalizedPath,
+    forcedPath: "/notifications",
     targetUrl
   });
 

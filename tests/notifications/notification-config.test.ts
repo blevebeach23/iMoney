@@ -24,23 +24,35 @@ describe("notification and push configuration", () => {
     expect(serviceWorker).toContain("client.postMessage");
     expect(serviceWorker).toContain("imoney:notification-received");
     expect(serviceWorker).toContain("self.addEventListener(\"notificationclick\"");
-    expect(serviceWorker).toContain("normalizeNotificationUrl");
-    expect(serviceWorker).toContain("url.origin !== self.location.origin");
-    expect(serviceWorker).toContain("isKnownNotificationRoute");
-    expect(serviceWorker).toContain("new URL(normalizedPath, self.location.origin)");
+    expect(serviceWorker).toContain("notificationCenterUrl");
+    expect(serviceWorker).toContain("new URL(\"/notifications\", self.location.origin)");
     expect(serviceWorker).toContain("client.navigate(targetUrl)");
     expect(serviceWorker).toContain("clients.openWindow(targetUrl)");
     expect(serviceWorker).toContain("/icons/icon-192.png");
   });
 
-  it("keeps notificationclick from navigating to non-whitelisted routes that would 404", () => {
+  it("forces every notificationclick to open the notification center", () => {
+    const serviceWorker = readFileSync(join(root, "public", "sw.js"), "utf8");
+    const clickHandler = serviceWorker.slice(serviceWorker.indexOf("self.addEventListener(\"notificationclick\""));
+
+    expect(clickHandler).toContain("const targetUrl = notificationCenterUrl()");
+    expect(clickHandler).toContain("forcedPath: \"/notifications\"");
+    expect(clickHandler).toContain("client.navigate(targetUrl)");
+    expect(clickHandler).toContain("clients.openWindow(targetUrl)");
+    expect(clickHandler).not.toContain("event.notification.data?.url");
+    expect(clickHandler).not.toContain("destination_url");
+    expect(clickHandler).not.toContain("entity_type");
+    expect(clickHandler).not.toContain("entity_id");
+    expect(clickHandler).not.toContain("metadata");
+  });
+
+  it("versions the service worker cache so old notificationclick handlers are replaced", () => {
     const serviceWorker = readFileSync(join(root, "public", "sw.js"), "utf8");
 
-    expect(serviceWorker).toContain("fallbackApplied = true");
-    expect(serviceWorker).toContain("normalizedPath = \"/notifications\"");
-    expect(serviceWorker).toContain("originalUrl");
-    expect(serviceWorker).toContain("targetUrl");
-    expect(serviceWorker).not.toContain("new URL(event.notification.data?.url");
+    expect(serviceWorker).toContain("const CACHE_NAME = \"imoney-v2-notification-click\"");
+    expect(serviceWorker).toContain("self.skipWaiting()");
+    expect(serviceWorker).toContain("self.clients.claim()");
+    expect(serviceWorker).toContain("keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))");
   });
 
   it("keeps VAPID private configuration out of public client env vars", () => {
