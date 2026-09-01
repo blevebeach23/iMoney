@@ -31,18 +31,24 @@ async function requireUser() {
   return { supabase, user };
 }
 
-export async function markNotificationReadAction(formData: FormData) {
-  const id = String(formData.get("id") ?? "");
+export async function markNotificationReadAction(input: FormData | string) {
+  const id = typeof input === "string" ? input : String(input.get("id") ?? "");
   const { supabase, user } = await requireUser();
   await markNotificationRead(supabase, user.id, id);
+  const { getUnreadNotificationCount } = await import("@/services/notifications/notification-service");
+  const unreadCount = await getUnreadNotificationCount(supabase, user.id);
   revalidatePath("/notifications");
+  return { ok: true, unreadCount };
 }
 
 export async function markAllNotificationsReadAction() {
   const { supabase, user } = await requireUser();
   await markAllNotificationsRead(supabase, user.id);
+  const { getUnreadNotificationCount } = await import("@/services/notifications/notification-service");
+  const unreadCount = await getUnreadNotificationCount(supabase, user.id);
   revalidatePath("/notifications");
   revalidatePath("/");
+  return { ok: true, unreadCount };
 }
 
 export async function savePushSubscriptionAction(payload: unknown) {

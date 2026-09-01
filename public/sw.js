@@ -107,7 +107,17 @@ self.addEventListener("push", (event) => {
       },
       icon: payload.icon || "/icons/icon-192.png",
       badge: payload.badge || "/icons/favicon-32.png"
-    })
+    }).then(() =>
+      self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) =>
+        Promise.all(
+          clients.map((client) =>
+            client.postMessage({
+              type: "imoney:notification-received"
+            })
+          )
+        )
+      )
+    )
   );
 });
 

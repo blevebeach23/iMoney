@@ -10,7 +10,8 @@ const householdInviteStatusLabels: Record<HouseholdInviteStatus, string> = {
   PENDING: "In attesa",
   ACCEPTED: "Accettato",
   REJECTED: "Rifiutato",
-  EXPIRED: "Scaduto"
+  EXPIRED: "Scaduto",
+  CANCELLED: "Cancellato"
 };
 
 export function householdMemberStatusLabel(status: HouseholdMemberStatus): string {

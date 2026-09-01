@@ -47,6 +47,7 @@ export default async function FamilySettingsPage({ searchParams }: Readonly<{ se
         monthStart={range.monthStart}
         previousMonthStart={previousMonthStart(range.monthStart)}
         preference={null}
+        currentUserId={user.id}
       />
     );
   }
@@ -74,6 +75,7 @@ export default async function FamilySettingsPage({ searchParams }: Readonly<{ se
       monthStart={range.monthStart}
       previousMonthStart={previousMonthStart(range.monthStart)}
       preference={preference}
+      currentUserId={user.id}
     />
   );
 }

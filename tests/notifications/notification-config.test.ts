@@ -21,6 +21,8 @@ describe("notification and push configuration", () => {
 
     expect(serviceWorker).toContain("self.addEventListener(\"push\"");
     expect(serviceWorker).toContain("showNotification");
+    expect(serviceWorker).toContain("client.postMessage");
+    expect(serviceWorker).toContain("imoney:notification-received");
     expect(serviceWorker).toContain("self.addEventListener(\"notificationclick\"");
     expect(serviceWorker).toContain("/icons/icon-192.png");
   });
@@ -45,5 +47,27 @@ describe("notification and push configuration", () => {
     expect(service).toContain("result === \"gone\"");
     expect(service).toContain(".delete().eq(\"endpoint\"");
     expect(service).toContain("return []");
+  });
+
+  it("updates the top-right unread badge from notification read events without a full reload", () => {
+    const topRightActions = readFileSync(join(root, "src", "components", "layout", "top-right-actions.tsx"), "utf8");
+    const notificationActions = readFileSync(join(root, "src", "components", "notifications", "notification-actions.tsx"), "utf8");
+
+    expect(topRightActions).toContain("NOTIFICATION_UNREAD_COUNT_CHANGED");
+    expect(topRightActions).toContain("NOTIFICATION_RECEIVED_FROM_SERVICE_WORKER");
+    expect(topRightActions).toContain("setUnreadCount(detail.count)");
+    expect(topRightActions).toContain("updatePwaAppBadge(nextUnreadCount)");
+    expect(topRightActions).toContain("navigator.serviceWorker?.addEventListener(\"message\"");
+    expect(notificationActions).toContain("emitNotificationUnreadCountChanged(result.unreadCount)");
+    expect(notificationActions).toContain("router.refresh()");
+  });
+
+  it("uses the Badging API with feature detection and keeps unsupported browsers safe", () => {
+    const unreadEvents = readFileSync(join(root, "src", "lib", "notifications", "unread-events.ts"), "utf8");
+
+    expect(unreadEvents).toContain("\"setAppBadge\" in navigator");
+    expect(unreadEvents).toContain("navigator.setAppBadge?.(unreadCount)");
+    expect(unreadEvents).toContain("navigator.clearAppBadge?.()");
+    expect(unreadEvents).toContain("catch(() => undefined)");
   });
 });

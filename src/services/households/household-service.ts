@@ -133,11 +133,9 @@ export async function getHouseholdById(supabase: SupabaseClient, householdId: st
 }
 
 export async function getHouseholdMembers(supabase: SupabaseClient, householdId: string): Promise<HouseholdMemberListItem[]> {
-  const { data, error } = await supabase
-    .from("household_members")
-    .select("*, profiles!household_members_user_id_fkey(full_name, username)")
-    .eq("household_id", householdId)
-    .order("created_at", { ascending: true });
+  const { data, error } = await supabase.rpc("get_household_members_for_display", {
+    target_household_id: householdId
+  });
 
   if (error) {
     throw error;
@@ -278,6 +276,18 @@ export async function getHouseholdInvites(supabase: SupabaseClient, householdId:
   return (data ?? []).map(mapHouseholdInviteRow);
 }
 
+export async function cancelHouseholdInvite(supabase: SupabaseClient, inviteId: string): Promise<string> {
+  const { data, error } = await supabase.rpc("cancel_household_invite", {
+    invite_id: inviteId
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return String(data);
+}
+
 export async function getPendingInvitesForCurrentUser(supabase: SupabaseClient): Promise<HouseholdInviteListItem[]> {
   const { data, error } = await supabase
     .from("household_invites")
@@ -297,6 +307,18 @@ export async function respondToHouseholdInvite(supabase: SupabaseClient, token: 
   const { data, error } = await supabase.rpc("respond_to_household_invite", {
     invite_token: token,
     accept_invite: accept
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return String(data);
+}
+
+export async function leaveHousehold(supabase: SupabaseClient, householdId: string): Promise<string> {
+  const { data, error } = await supabase.rpc("leave_household", {
+    target_household_id: householdId
   });
 
   if (error) {
@@ -344,6 +366,9 @@ function mapHouseholdRow(row: Row): Household {
 
 function mapHouseholdMemberRow(row: Row): HouseholdMemberListItem {
   const profile = asRecord(row.profiles);
+  const fullName = row.full_name ?? profile?.full_name;
+  const username = row.username ?? profile?.username;
+
   return {
     householdId: String(row.household_id),
     userId: String(row.user_id),
@@ -352,8 +377,8 @@ function mapHouseholdMemberRow(row: Row): HouseholdMemberListItem {
     invitedBy: row.invited_by ? String(row.invited_by) : null,
     joinedAt: row.joined_at ? String(row.joined_at) : null,
     removedAt: row.removed_at ? String(row.removed_at) : null,
-    fullName: String(profile?.full_name ?? "Membro"),
-    username: String(profile?.username ?? "")
+    fullName: fullName ? String(fullName) : "Membro",
+    username: username ? String(username) : ""
   };
 }
 

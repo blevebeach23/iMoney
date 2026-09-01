@@ -7,7 +7,7 @@ export type AccountType = "cash" | "bank" | "credit_card" | "other";
 export type FundType = "savings" | "holiday" | "emergency" | "deposit" | "custom";
 export type HouseholdRole = "owner" | "admin" | "member";
 export type HouseholdMemberStatus = "INVITED" | "ACTIVE" | "REMOVED";
-export type HouseholdInviteStatus = "PENDING" | "ACCEPTED" | "REJECTED" | "EXPIRED";
+export type HouseholdInviteStatus = "PENDING" | "ACCEPTED" | "REJECTED" | "EXPIRED" | "CANCELLED";
 export type FixedExpenseFrequency = "monthly" | "quarterly" | "yearly" | "custom";
 
 export interface MacroCategory {

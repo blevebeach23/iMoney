@@ -6,6 +6,8 @@ import { toFieldErrors, type FormState } from "@/lib/auth/validation";
 import {
   householdFormSchema,
   householdInviteResponseSchema,
+  householdInviteCancelSchema,
+  householdLeaveSchema,
   householdInviteSchema,
   householdMemberRemoveSchema,
   householdMemberRoleSchema,
@@ -15,9 +17,11 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { notifyFamilyEvent } from "@/services/notifications/notification-service";
 import {
+  cancelHouseholdInvite,
   createHousehold,
   createHouseholdInvite,
   HouseholdInviteError,
+  leaveHousehold,
   removeHouseholdMember,
   respondToHouseholdInvite,
   updateHouseholdMemberRole,
@@ -126,6 +130,36 @@ export async function removeHouseholdMemberAction(formData: FormData) {
   const { supabase } = await requireUser();
   await removeHouseholdMember(supabase, parsed.householdId, parsed.userId);
   revalidatePath("/family/settings");
+}
+
+export async function leaveHouseholdAction(_prevState: FormState, formData: FormData): Promise<FormState> {
+  const parsed = householdLeaveSchema.safeParse({
+    householdId: String(formData.get("householdId") ?? "")
+  });
+
+  if (!parsed.success) {
+    return { ok: false, fieldErrors: toFieldErrors(parsed.error) };
+  }
+
+  try {
+    const { supabase } = await requireUser();
+    await leaveHousehold(supabase, parsed.data.householdId);
+    revalidatePath("/family");
+    revalidatePath("/family/settings");
+    return { ok: true, message: "Condivisione interrotta." };
+  } catch (error) {
+    return { ok: false, message: messageFromError(error) };
+  }
+}
+
+export async function cancelHouseholdInviteAction(formData: FormData) {
+  const parsed = householdInviteCancelSchema.parse({
+    inviteId: String(formData.get("inviteId") ?? "")
+  });
+  const { supabase } = await requireUser();
+  await cancelHouseholdInvite(supabase, parsed.inviteId);
+  revalidatePath("/family/settings");
+  revalidatePath("/notifications");
 }
 
 export async function updateHouseholdPreferenceAction(formData: FormData) {

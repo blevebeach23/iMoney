@@ -21,6 +21,14 @@ export const householdMemberRemoveSchema = z.object({
   userId: z.string().uuid()
 });
 
+export const householdLeaveSchema = z.object({
+  householdId: z.string().uuid()
+});
+
+export const householdInviteCancelSchema = z.object({
+  inviteId: z.string().uuid()
+});
+
 export const householdPreferenceSchema = z.object({
   householdId: z.string().uuid(),
   shareNewMovementsByDefault: z.boolean()

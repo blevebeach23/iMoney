@@ -4,6 +4,7 @@ import type { LucideIcon } from "lucide-react";
 import { Bell } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { NOTIFICATION_RECEIVED_FROM_SERVICE_WORKER, NOTIFICATION_UNREAD_COUNT_CHANGED, updatePwaAppBadge } from "@/lib/notifications/unread-events";
 
 interface TopRightAction {
   href: string;
@@ -25,17 +26,45 @@ export function TopRightActions({ action }: Readonly<TopRightActionsProps>) {
   useEffect(() => {
     let isActive = true;
 
-    fetch("/api/notifications/unread-count", { cache: "no-store" })
+    function refreshUnreadCount() {
+      return fetch("/api/notifications/unread-count", { cache: "no-store" })
       .then((response) => (response.ok ? response.json() : { count: 0 }))
       .then((data: { count?: number }) => {
         if (isActive) {
-          setUnreadCount(Number(data.count ?? 0));
+          const nextUnreadCount = Number(data.count ?? 0);
+          setUnreadCount(nextUnreadCount);
+          updatePwaAppBadge(nextUnreadCount);
         }
       })
       .catch(() => undefined);
+    }
+
+    function handleUnreadCountChanged(event: Event) {
+      const detail = (event as CustomEvent<{ count?: number }>).detail;
+
+      if (typeof detail?.count === "number") {
+        setUnreadCount(detail.count);
+        updatePwaAppBadge(detail.count);
+        return;
+      }
+
+      void refreshUnreadCount();
+    }
+
+    function handleServiceWorkerMessage(event: MessageEvent<{ type?: string }>) {
+      if (event.data?.type === NOTIFICATION_RECEIVED_FROM_SERVICE_WORKER) {
+        void refreshUnreadCount();
+      }
+    }
+
+    void refreshUnreadCount();
+    window.addEventListener(NOTIFICATION_UNREAD_COUNT_CHANGED, handleUnreadCountChanged);
+    navigator.serviceWorker?.addEventListener("message", handleServiceWorkerMessage);
 
     return () => {
       isActive = false;
+      window.removeEventListener(NOTIFICATION_UNREAD_COUNT_CHANGED, handleUnreadCountChanged);
+      navigator.serviceWorker?.removeEventListener("message", handleServiceWorkerMessage);
     };
   }, []);
 

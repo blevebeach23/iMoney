@@ -4,6 +4,7 @@ import { loadPendingInviteNotifications } from "@/lib/households/notifications";
 import {
   createHousehold,
   createHouseholdInvite,
+  cancelHouseholdInvite,
   getHouseholdMembers,
   getPendingInvitesForCurrentUser,
   HouseholdInviteError
@@ -16,14 +17,11 @@ function supabaseWithRpc(result: { data: string | null; error: null | { code: st
 }
 
 function supabaseWithHouseholdMembers() {
-  const order = vi.fn().mockResolvedValue({ data: [], error: null });
-  const eq = vi.fn().mockReturnValue({ order });
-  const select = vi.fn().mockReturnValue({ eq });
-  const from = vi.fn().mockReturnValue({ select });
+  const rpc = vi.fn().mockResolvedValue({ data: [], error: null });
 
   return {
-    supabase: { from } as unknown as SupabaseClient,
-    select
+    supabase: { rpc } as unknown as SupabaseClient,
+    rpc
   };
 }
 
@@ -140,12 +138,14 @@ describe("household service", () => {
     expect(JSON.stringify(consoleError.mock.calls)).not.toContain("Famiglia Segreta");
   });
 
-  it("embeds member profiles through the user_id foreign key", async () => {
-    const { supabase, select } = supabaseWithHouseholdMembers();
+  it("loads household member display profiles through the server-side RPC", async () => {
+    const { supabase, rpc } = supabaseWithHouseholdMembers();
 
     await expect(getHouseholdMembers(supabase, "10000000-0000-0000-0000-000000000001")).resolves.toEqual([]);
 
-    expect(select).toHaveBeenCalledWith("*, profiles!household_members_user_id_fkey(full_name, username)");
+    expect(rpc).toHaveBeenCalledWith("get_household_members_for_display", {
+      target_household_id: "10000000-0000-0000-0000-000000000001"
+    });
   });
 
   it("marks invites for already registered users", async () => {
@@ -321,6 +321,17 @@ describe("household service", () => {
     await expect(getPendingInvitesForCurrentUser(supabase)).resolves.toEqual([]);
 
     expect(select).toHaveBeenCalledWith("*, profiles!household_invites_invited_by_fkey(full_name), households(name)");
+  });
+
+  it("cancels a pending household invite through the server-side RPC", async () => {
+    const supabase = {
+      rpc: vi.fn().mockResolvedValue({ data: "10000000-0000-0000-0000-000000000001", error: null })
+    } as unknown as SupabaseClient;
+
+    await expect(cancelHouseholdInvite(supabase, "20000000-0000-0000-0000-000000000001")).resolves.toBe("10000000-0000-0000-0000-000000000001");
+    expect(supabase.rpc).toHaveBeenCalledWith("cancel_household_invite", {
+      invite_id: "20000000-0000-0000-0000-000000000001"
+    });
   });
 
   it("degrades pending invite notifications without throwing a 500", async () => {

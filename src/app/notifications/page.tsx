@@ -2,9 +2,9 @@ import { Bell, Check, X } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { MarkAllNotificationsReadButton, MarkNotificationReadButton } from "@/components/notifications/notification-actions";
 import { respondToHouseholdInviteAction } from "@/lib/households/actions";
 import { loadPendingInviteNotifications } from "@/lib/households/notifications";
-import { markAllNotificationsReadAction, markNotificationReadAction } from "@/lib/notifications/actions";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getNotifications, getUnreadNotificationCount } from "@/services/notifications/notification-service";
 
@@ -38,13 +38,7 @@ export default async function NotificationsPage({
         <h1 className="mt-2 text-3xl font-bold tracking-normal text-foreground">Centro notifiche</h1>
         <div className="mt-3 flex items-center justify-between gap-3">
           <p className="text-sm text-zinc-600">{unreadCount === 1 ? "1 notifica non letta" : `${unreadCount} notifiche non lette`}</p>
-          {unreadCount > 0 && (
-            <form action={markAllNotificationsReadAction}>
-              <Button type="submit" variant="secondary">
-                Segna tutte come lette
-              </Button>
-            </form>
-          )}
+          {unreadCount > 0 && <MarkAllNotificationsReadButton />}
         </div>
       </header>
 
@@ -70,12 +64,7 @@ export default async function NotificationsPage({
                   </Link>
                 )}
                 {!notification.isRead && (
-                  <form action={markNotificationReadAction} className={notification.destinationUrl ? "flex-1" : "w-full"}>
-                    <input type="hidden" name="id" value={notification.id} />
-                    <Button type="submit" variant="secondary" className="w-full">
-                      Segna come letta
-                    </Button>
-                  </form>
+                  <MarkNotificationReadButton id={notification.id} className={notification.destinationUrl ? "flex-1" : "w-full"} />
                 )}
               </div>
             </article>

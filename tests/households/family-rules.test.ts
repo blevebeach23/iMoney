@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import { calculateBudgetReport } from "@/lib/calculations/budget";
 import type { MovementCategoryInfo } from "@/lib/calculations/category-aggregates";
 import { filterFamilySharedFunds, filterFamilySharedMovements, isActiveHouseholdMember } from "@/lib/households/family-rules";
+import { canCurrentUserManageMember, shouldShowPromoteToAdmin, sortHouseholdMembersForDisplay } from "@/lib/households/member-ui";
 import { householdInviteStatusLabel, householdMemberStatusLabel } from "@/lib/households/status-labels";
 import { householdFormSchema, householdInviteResponseSchema, householdInviteSchema, householdPreferenceSchema } from "@/lib/households/validation";
 import type { Budget, Fund, HouseholdMember, Movement } from "@/types/domain";
+import type { HouseholdMemberListItem } from "@/services/households/household-service";
 
 function member(partial: Partial<HouseholdMember> = {}): HouseholdMember {
   return {
@@ -16,6 +18,17 @@ function member(partial: Partial<HouseholdMember> = {}): HouseholdMember {
     joinedAt: "2026-08-29T10:00:00Z",
     removedAt: null,
     ...partial
+  };
+}
+
+function displayMember(partial: Partial<HouseholdMemberListItem> = {}): HouseholdMemberListItem {
+  const base = member(partial);
+
+  return {
+    ...base,
+    fullName: partial.fullName ?? `Utente ${base.userId}`,
+    username: partial.username ?? "",
+    email: partial.email
   };
 }
 
@@ -108,9 +121,42 @@ describe("family rules", () => {
     expect(householdInviteStatusLabel("PENDING")).toBe("In attesa");
     expect(householdInviteStatusLabel("ACCEPTED")).toBe("Accettato");
     expect(householdInviteStatusLabel("REJECTED")).toBe("Rifiutato");
+    expect(householdInviteStatusLabel("CANCELLED")).toBe("Cancellato");
     expect(householdMemberStatusLabel("ACTIVE")).toBe("Attivo");
     expect(householdMemberStatusLabel("INVITED")).toBe("Invitato");
     expect(householdMemberStatusLabel("REMOVED")).toBe("Rimosso");
+  });
+
+  it("orders the current user first, then other admins, then members", () => {
+    const members = [
+      displayMember({ userId: "member-2", role: "member", fullName: "Zeta" }),
+      displayMember({ userId: "admin-2", role: "admin", fullName: "Admin" }),
+      displayMember({ userId: "current-user", role: "member", fullName: "Io" }),
+      displayMember({ userId: "member-1", role: "member", fullName: "Anna" })
+    ];
+
+    expect(sortHouseholdMembersForDisplay(members, "current-user").map((item) => item.userId)).toEqual(["current-user", "admin-2", "member-1", "member-2"]);
+  });
+
+  it("does not expose admin controls for the current user", () => {
+    const current = displayMember({ userId: "current-user", role: "owner" });
+
+    expect(canCurrentUserManageMember("owner", "current-user", current)).toBe(false);
+    expect(shouldShowPromoteToAdmin("owner", "current-user", current)).toBe(false);
+  });
+
+  it("allows admins to manage other non-admin members only", () => {
+    const normalMember = displayMember({ userId: "member-1", role: "member" });
+    const adminMember = displayMember({ userId: "admin-1", role: "admin" });
+
+    expect(canCurrentUserManageMember("owner", "current-user", normalMember)).toBe(true);
+    expect(shouldShowPromoteToAdmin("owner", "current-user", normalMember)).toBe(true);
+    expect(canCurrentUserManageMember("owner", "current-user", adminMember)).toBe(true);
+    expect(shouldShowPromoteToAdmin("owner", "current-user", adminMember)).toBe(false);
+  });
+
+  it("hides member management controls from normal members", () => {
+    expect(canCurrentUserManageMember("member", "current-user", displayMember({ userId: "member-1" }))).toBe(false);
   });
 
   it("validates default sharing preference input", () => {
