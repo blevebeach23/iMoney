@@ -32,8 +32,8 @@ const notificationRow = {
 function adminSupabase(subscriptionRows = [pushSubscriptionRow()]) {
   const notificationIn = vi.fn().mockResolvedValue({ data: [notificationRow], error: null });
   const notificationSelect = vi.fn().mockReturnValue({ in: notificationIn });
-  const subscriptionEq = vi.fn().mockResolvedValue({ data: subscriptionRows, error: null });
-  const subscriptionSelect = vi.fn().mockReturnValue({ eq: subscriptionEq });
+  const subscriptionIn = vi.fn().mockResolvedValue({ data: subscriptionRows, error: null });
+  const subscriptionSelect = vi.fn().mockReturnValue({ in: subscriptionIn });
   const updateEq = vi.fn().mockResolvedValue({ error: null });
   const update = vi.fn().mockReturnValue({ eq: updateEq });
   const deleteEq = vi.fn().mockResolvedValue({ error: null });
@@ -56,7 +56,7 @@ function adminSupabase(subscriptionRows = [pushSubscriptionRow()]) {
     deleteSubscription,
     from,
     notificationIn,
-    subscriptionEq,
+    subscriptionIn,
     update,
     updateEq
   };
@@ -64,6 +64,7 @@ function adminSupabase(subscriptionRows = [pushSubscriptionRow()]) {
 
 function pushSubscriptionRow() {
   return {
+    user_id: "recipient-1",
     endpoint: "https://push.example/subscription-1",
     p256dh: "p256dh-key",
     auth: "auth-token",
@@ -98,6 +99,7 @@ describe("web push delivery", () => {
     expect(created).toEqual([{ notification_id: "notification-1", recipient_user_id: "recipient-1" }]);
     expect(rpc).toHaveBeenCalledWith("create_household_notifications", expect.any(Object));
     expect(sendWebPush).toHaveBeenCalledWith(expect.objectContaining({ endpoint: "https://push.example/subscription-1" }), expect.objectContaining({ id: "notification-1" }));
+    expect(admin.subscriptionIn).toHaveBeenCalledWith("user_id", ["recipient-1"]);
     expect(admin.update).toHaveBeenCalledWith(expect.objectContaining({ last_used_at: expect.any(String) }));
   });
 

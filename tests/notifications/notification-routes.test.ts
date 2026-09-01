@@ -29,6 +29,29 @@ describe("notification route mapping", () => {
     );
   });
 
+  it("opens future expense reminders on their stored personal or family route", () => {
+    expect(
+      resolveNotificationDestination(
+        notification({
+          destinationUrl: "/movements/10000000-0000-4000-8000-000000000001",
+          entityType: "movement",
+          entityId: "10000000-0000-4000-8000-000000000001",
+          type: "future_expense_reminder"
+        })
+      )
+    ).toBe("/movements/10000000-0000-4000-8000-000000000001");
+    expect(
+      resolveNotificationDestination(
+        notification({
+          destinationUrl: "/family/movements/10000000-0000-4000-8000-000000000001",
+          entityType: "movement",
+          entityId: "10000000-0000-4000-8000-000000000001",
+          type: "future_expense_reminder"
+        })
+      )
+    ).toBe("/family/movements/10000000-0000-4000-8000-000000000001");
+  });
+
   it("opens transfer and fund notifications on existing detail routes", () => {
     expect(resolveNotificationDestination(notification({ type: "transfer_shared", entityType: "transfer", entityId: "10000000-0000-4000-8000-000000000002" }))).toBe(
       "/transfers/10000000-0000-4000-8000-000000000002"

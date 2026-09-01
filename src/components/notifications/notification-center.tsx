@@ -61,6 +61,10 @@ export function NotificationCenter({ initialNotifications, initialUnreadCount }:
 }
 
 function notificationTypeLabel(type: string) {
+  if (type === "future_expense_reminder") {
+    return "Promemoria";
+  }
+
   if (type.startsWith("movement_")) {
     return "Movimenti";
   }

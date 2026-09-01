@@ -25,6 +25,10 @@ interface CreatedNotificationRow {
   recipient_user_id: string;
 }
 
+interface StoredPushSubscription extends PushSubscriptionInput {
+  userId: string;
+}
+
 export interface NotificationActor {
   id: string;
   displayName: string;
@@ -333,8 +337,27 @@ export async function deliverPushForNotifications(notificationIds: string[]) {
     return;
   }
 
-  for (const notification of (notifications ?? []).map(mapNotificationRow)) {
-    await deliverPushForNotification(admin, notification);
+  const mappedNotifications = (notifications ?? []).map(mapNotificationRow);
+  const recipientUserIds = [...new Set(mappedNotifications.map((notification) => notification.recipientUserId))];
+
+  if (recipientUserIds.length === 0) {
+    return;
+  }
+
+  const { data: subscriptionRows, error: subscriptionsError } = await admin
+    .from("push_subscriptions")
+    .select("user_id, endpoint, p256dh, auth, user_agent")
+    .in("user_id", recipientUserIds);
+
+  if (subscriptionsError) {
+    console.error("[push] Subscription lookup failed", { message: subscriptionsError.message });
+    return;
+  }
+
+  const subscriptionsByUser = groupPushSubscriptionsByUser(subscriptionRows ?? []);
+
+  for (const notification of mappedNotifications) {
+    await deliverPushForNotification(admin, notification, subscriptionsByUser.get(notification.recipientUserId) ?? []);
   }
 }
 
@@ -477,16 +500,8 @@ async function createDirectNotification(
   return notificationId;
 }
 
-async function deliverPushForNotification(admin: SupabaseClient, notification: AppNotification) {
-  const { data, error } = await admin.from("push_subscriptions").select("*").eq("user_id", notification.recipientUserId);
-
-  if (error) {
-    console.error("[push] Subscription lookup failed", { message: error.message });
-    return;
-  }
-
-  for (const row of data ?? []) {
-    const subscription = mapPushSubscriptionRow(row);
+async function deliverPushForNotification(admin: SupabaseClient, notification: AppNotification, subscriptions: PushSubscriptionInput[]) {
+  for (const subscription of subscriptions) {
     const result = await sendWebPush(subscription, notification);
 
     if (result === "sent") {
@@ -497,8 +512,22 @@ async function deliverPushForNotification(admin: SupabaseClient, notification: A
   }
 }
 
-function mapPushSubscriptionRow(row: Row): PushSubscriptionInput {
+function groupPushSubscriptionsByUser(rows: Row[]) {
+  const subscriptionsByUser = new Map<string, StoredPushSubscription[]>();
+
+  for (const row of rows) {
+    const subscription = mapPushSubscriptionRow(row);
+    const subscriptions = subscriptionsByUser.get(subscription.userId) ?? [];
+    subscriptions.push(subscription);
+    subscriptionsByUser.set(subscription.userId, subscriptions);
+  }
+
+  return subscriptionsByUser;
+}
+
+function mapPushSubscriptionRow(row: Row): StoredPushSubscription {
   return {
+    userId: String(row.user_id),
     endpoint: String(row.endpoint),
     p256dh: String(row.p256dh),
     auth: String(row.auth),

@@ -97,6 +97,7 @@ describe("notification and push configuration", () => {
     expect(service).toContain("result === \"gone\"");
     expect(service).toContain(".delete().eq(\"endpoint\"");
     expect(service).toContain("return []");
+    expect(service).toContain(".in(\"user_id\", recipientUserIds)");
   });
 
   it("saves PWA subscriptions through the server action without returning a 500 on RLS upsert conflicts", () => {

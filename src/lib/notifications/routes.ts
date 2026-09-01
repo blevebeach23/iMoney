@@ -8,6 +8,10 @@ type NotificationDestinationInput = Pick<AppNotification, "destinationUrl" | "en
 export function resolveNotificationDestination(notification: NotificationDestinationInput): string {
   const entityId = notification.entityId && UUID_PATTERN.test(notification.entityId) ? encodeURIComponent(notification.entityId) : null;
 
+  if (notification.type === "future_expense_reminder") {
+    return sanitizeNotificationDestination(notification.destinationUrl);
+  }
+
   if (notification.entityType === "movement" && notification.type.endsWith("_deleted")) {
     return NOTIFICATION_FALLBACK_URL;
   }

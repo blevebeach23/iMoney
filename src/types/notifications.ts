@@ -5,6 +5,7 @@ export type NotificationType =
   | "family_member_joined"
   | "family_member_removed"
   | "family_role_changed"
+  | "future_expense_reminder"
   | "movement_shared_created"
   | "movement_shared_updated"
   | "movement_shared_deleted"
