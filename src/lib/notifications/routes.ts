@@ -1,11 +1,12 @@
 import type { AppNotification } from "@/types/notifications";
 
 export const NOTIFICATION_FALLBACK_URL = "/notifications";
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type NotificationDestinationInput = Pick<AppNotification, "destinationUrl" | "entityId" | "entityType" | "householdId" | "metadata" | "type">;
 
 export function resolveNotificationDestination(notification: NotificationDestinationInput): string {
-  const entityId = notification.entityId ? encodeURIComponent(notification.entityId) : null;
+  const entityId = notification.entityId && UUID_PATTERN.test(notification.entityId) ? encodeURIComponent(notification.entityId) : null;
 
   if (notification.entityType === "movement" && notification.type.endsWith("_deleted")) {
     return NOTIFICATION_FALLBACK_URL;
@@ -34,8 +35,7 @@ export function resolveNotificationDestination(notification: NotificationDestina
       return budgetMonthUrl;
     }
 
-    const explicitDestination = sanitizeNotificationDestination(notification.destinationUrl);
-    return explicitDestination === NOTIFICATION_FALLBACK_URL ? "/budgets" : explicitDestination;
+    return sanitizeNotificationDestination(notification.destinationUrl);
   }
 
   if (notification.type === "family_invite") {
@@ -43,7 +43,7 @@ export function resolveNotificationDestination(notification: NotificationDestina
   }
 
   if (notification.entityType === "household") {
-    return notification.householdId ? `/family?householdId=${encodeURIComponent(notification.householdId)}` : "/family";
+    return "/family";
   }
 
   return sanitizeNotificationDestination(notification.destinationUrl);
@@ -83,11 +83,9 @@ function isKnownNotificationRoute(pathname: string) {
   return (
     pathname === NOTIFICATION_FALLBACK_URL ||
     pathname === "/family" ||
-    pathname === "/family/settings" ||
-    pathname === "/budgets" ||
-    /^\/movements\/[^/]+$/.test(pathname) ||
-    /^\/transfers\/[^/]+$/.test(pathname) ||
-    /^\/funds\/[^/]+$/.test(pathname) ||
+    /^\/movements\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pathname) ||
+    /^\/transfers\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pathname) ||
+    /^\/funds\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pathname) ||
     /^\/budgets\/\d{4}\/\d{2}$/.test(pathname)
   );
 }

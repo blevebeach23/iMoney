@@ -112,6 +112,11 @@ export async function sendWebPush(subscription: PushSubscriptionInput, notificat
       icon: "/icons/icon-192.png",
       badge: "/icons/favicon-32.png"
     };
+    console.info("[push] Serialized notification payload", {
+      notificationId: payload.notificationId,
+      type: payload.type,
+      url: payload.url
+    });
     const encrypted = encryptPayload(subscription, payload);
     const response = await fetch(subscription.endpoint, {
       method: "POST",

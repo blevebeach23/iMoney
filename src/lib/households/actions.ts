@@ -21,6 +21,7 @@ import {
   createHousehold,
   createHouseholdInvite,
   HouseholdInviteError,
+  getHouseholdMembers,
   leaveHousehold,
   removeHouseholdMember,
   respondToHouseholdInvite,
@@ -117,8 +118,22 @@ export async function updateHouseholdMemberRoleAction(formData: FormData) {
     userId: String(formData.get("userId") ?? ""),
     role: String(formData.get("role") ?? "member")
   });
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
+  const members = await getHouseholdMembers(supabase, parsed.householdId);
+  const targetMember = members.find((member) => member.userId === parsed.userId);
   await updateHouseholdMemberRole(supabase, parsed.householdId, parsed.userId, parsed.role);
+  if (parsed.role === "admin") {
+    const targetName = (targetMember?.fullName || targetMember?.username || "un membro").trim().split(/\s+/)[0] || "un membro";
+    await notifyFamilyEvent(
+      supabase,
+      parsed.householdId,
+      "family_role_changed",
+      "Ruolo famiglia aggiornato",
+      `ha nominato ${targetName} amministratore.`,
+      `role:${parsed.userId}:admin`,
+      user.id
+    );
+  }
   revalidatePath("/family/settings");
 }
 
@@ -181,7 +196,7 @@ export async function respondToHouseholdInviteAction(formData: FormData) {
   let destination = parsed.accept ? "/family" : "/notifications";
 
   try {
-    const { supabase } = await requireUser();
+    const { supabase, user } = await requireUser();
     const householdId = await respondToHouseholdInvite(supabase, parsed.token, parsed.accept);
     await notifyFamilyEvent(
       supabase,
@@ -189,7 +204,8 @@ export async function respondToHouseholdInviteAction(formData: FormData) {
       parsed.accept ? "family_member_joined" : "family_invite_rejected",
       parsed.accept ? "Nuovo membro in famiglia" : "Invito famiglia rifiutato",
       parsed.accept ? "Un nuovo membro ha accettato l'invito famiglia." : "Un invito famiglia è stato rifiutato.",
-      `invite:${parsed.token}:${parsed.accept ? "accepted" : "rejected"}`
+      `invite:${parsed.token}:${parsed.accept ? "accepted" : "rejected"}`,
+      user.id
     );
     revalidatePath("/family");
     revalidatePath("/family/settings");

@@ -91,11 +91,11 @@ export async function saveFundAction(_prevState: FormState, formData: FormData):
     const { supabase, user } = await requireUser();
     if (parsed.data.id) {
       const fund = await updateFund(supabase, user.id, { ...parsed.data, id: parsed.data.id });
-      await notifySharedFund(supabase, fund, fund.isSharedWithHousehold ? "updated" : "unshared");
+      await notifySharedFund(supabase, fund, fund.isSharedWithHousehold ? "updated" : "unshared", user.id);
     } else {
       const fund = await createFund(supabase, user.id, parsed.data);
       if (fund.isSharedWithHousehold) {
-        await notifySharedFund(supabase, fund, "created");
+        await notifySharedFund(supabase, fund, "created", user.id);
       }
     }
     revalidatePath("/funds");

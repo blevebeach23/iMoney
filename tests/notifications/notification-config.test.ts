@@ -27,8 +27,20 @@ describe("notification and push configuration", () => {
     expect(serviceWorker).toContain("normalizeNotificationUrl");
     expect(serviceWorker).toContain("url.origin !== self.location.origin");
     expect(serviceWorker).toContain("isKnownNotificationRoute");
+    expect(serviceWorker).toContain("new URL(normalizedPath, self.location.origin)");
+    expect(serviceWorker).toContain("client.navigate(targetUrl)");
     expect(serviceWorker).toContain("clients.openWindow(targetUrl)");
     expect(serviceWorker).toContain("/icons/icon-192.png");
+  });
+
+  it("keeps notificationclick from navigating to non-whitelisted routes that would 404", () => {
+    const serviceWorker = readFileSync(join(root, "public", "sw.js"), "utf8");
+
+    expect(serviceWorker).toContain("fallbackApplied = true");
+    expect(serviceWorker).toContain("normalizedPath = \"/notifications\"");
+    expect(serviceWorker).toContain("originalUrl");
+    expect(serviceWorker).toContain("targetUrl");
+    expect(serviceWorker).not.toContain("new URL(event.notification.data?.url");
   });
 
   it("keeps VAPID private configuration out of public client env vars", () => {

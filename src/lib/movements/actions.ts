@@ -67,10 +67,10 @@ export async function saveMovementAction(_prevState: FormState, formData: FormDa
     const { supabase, user } = await requireUser();
     if (parsed.data.id) {
       const movement = await updateMovement(supabase, user.id, { ...parsed.data, id: parsed.data.id });
-      await notifySharedMovement(supabase, movement, "updated");
+      await notifySharedMovement(supabase, movement, "updated", user.id);
     } else {
       const movement = await createMovement(supabase, user.id, parsed.data);
-      await notifySharedMovement(supabase, movement, "created");
+      await notifySharedMovement(supabase, movement, "created", user.id);
     }
   } catch (error) {
     return { ok: false, message: messageFromError(error) };
@@ -86,7 +86,7 @@ export async function deleteMovementAction(formData: FormData) {
   const movement = await getMovementById(supabase, user.id, id);
   await softDeleteMovement(supabase, user.id, id);
   if (movement) {
-    await notifySharedMovement(supabase, movement, "deleted");
+    await notifySharedMovement(supabase, movement, "deleted", user.id);
   }
   revalidatePath("/movements");
   redirect("/movements");

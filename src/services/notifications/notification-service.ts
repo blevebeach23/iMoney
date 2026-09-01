@@ -25,6 +25,11 @@ interface CreatedNotificationRow {
   recipient_user_id: string;
 }
 
+export interface NotificationActor {
+  id: string;
+  displayName: string;
+}
+
 export async function getNotifications(supabase: SupabaseClient, userId: string): Promise<AppNotification[]> {
   const { data, error } = await supabase
     .from("notifications")
@@ -165,11 +170,37 @@ export async function createHouseholdNotification(supabase: SupabaseClient, inpu
   return created;
 }
 
-export async function notifySharedMovement(supabase: SupabaseClient, movement: { amount: string; categoryName?: string; description: string; householdId: string | null; id: string; isSharedWithHousehold: boolean; type: string }, action: "created" | "updated" | "deleted") {
+export async function getNotificationActor(supabase: SupabaseClient, userId: string): Promise<NotificationActor> {
+  const { data, error } = await supabase.from("profiles").select("full_name, username").eq("id", userId).maybeSingle();
+
+  if (error) {
+    console.error("[notifications] Actor profile lookup failed", {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint
+    });
+  }
+
+  const row: Row = isRecord(data) ? data : {};
+
+  return {
+    id: userId,
+    displayName: shortDisplayName(row.full_name, row.username)
+  };
+}
+
+export async function notifySharedMovement(
+  supabase: SupabaseClient,
+  movement: { amount: string; categoryName?: string; description: string; householdId: string | null; id: string; isSharedWithHousehold: boolean; type: string },
+  action: "created" | "updated" | "deleted",
+  actorUserId?: string
+) {
   if (!movement.isSharedWithHousehold || !movement.householdId) {
     return [];
   }
 
+  const actor = actorUserId ? await getNotificationActor(supabase, actorUserId) : defaultNotificationActor();
   const isReimbursement = movement.type === "reimbursement";
   const title =
     action === "deleted"
@@ -179,8 +210,7 @@ export async function notifySharedMovement(supabase: SupabaseClient, movement: {
         : action === "created"
           ? "Nuovo movimento condiviso"
           : "Movimento condiviso aggiornato";
-  const verb = action === "deleted" ? "ha eliminato" : action === "updated" ? "ha aggiornato" : "ha aggiunto";
-  const body = `${verb[0].toUpperCase()}${verb.slice(1)} ${isReimbursement ? "un rimborso" : "un movimento"} condiviso di ${formatEuro(movement.amount)} per ${movement.categoryName ?? movement.description}.`;
+  const body = movementNotificationBody(actor.displayName, movement.amount, isReimbursement, action);
   const type: NotificationType = isReimbursement ? "reimbursement_shared_created" : action === "created" ? "movement_shared_created" : action === "updated" ? "movement_shared_updated" : "movement_shared_deleted";
 
   return createHouseholdNotification(supabase, {
@@ -195,11 +225,12 @@ export async function notifySharedMovement(supabase: SupabaseClient, movement: {
   });
 }
 
-export async function notifySharedFund(supabase: SupabaseClient, fund: Fund, action: "created" | "updated" | "target_reached" | "target_exceeded" | "unshared") {
+export async function notifySharedFund(supabase: SupabaseClient, fund: Fund, action: "created" | "updated" | "target_reached" | "target_exceeded" | "unshared", actorUserId?: string) {
   if (!fund.householdId) {
     return [];
   }
 
+  const actor = actorUserId ? await getNotificationActor(supabase, actorUserId) : defaultNotificationActor();
   const titles: Record<typeof action, string> = {
     created: "Nuovo fondo condiviso",
     updated: "Fondo condiviso aggiornato",
@@ -207,10 +238,7 @@ export async function notifySharedFund(supabase: SupabaseClient, fund: Fund, act
     target_exceeded: "Obiettivo fondo superato",
     unshared: "Fondo non più condiviso"
   };
-  const body =
-    action === "target_reached" || action === "target_exceeded"
-      ? `Il fondo ${fund.name} ha ${action === "target_reached" ? "raggiunto" : "superato"} il suo obiettivo${fund.targetAmount ? ` di ${formatEuro(fund.targetAmount)}` : ""}.`
-      : `Il fondo ${fund.name} è stato ${action === "created" ? "condiviso" : action === "updated" ? "aggiornato" : "rimosso dalla condivisione familiare"}.`;
+  const body = fundNotificationBody(actor.displayName, fund, action);
 
   return createHouseholdNotification(supabase, {
     householdId: fund.householdId,
@@ -224,10 +252,21 @@ export async function notifySharedFund(supabase: SupabaseClient, fund: Fund, act
   });
 }
 
-export async function notifyHouseholdBudget(supabase: SupabaseClient, householdId: string, budget: BudgetListItem | { id: string; amount: string; categoryName?: string | null; macroCategoryName?: string | null }, action: "created" | "updated" | "exceeded") {
+export async function notifyHouseholdBudget(
+  supabase: SupabaseClient,
+  householdId: string,
+  budget: BudgetListItem | { id: string; amount: string; categoryName?: string | null; macroCategoryName?: string | null; month?: string },
+  action: "created" | "updated" | "exceeded",
+  actorUserId?: string
+) {
+  const actor = actorUserId ? await getNotificationActor(supabase, actorUserId) : defaultNotificationActor();
   const scope = budget.categoryName ?? budget.macroCategoryName ?? "Famiglia";
   const title = action === "exceeded" ? "Budget superato" : action === "created" ? "Nuovo budget famiglia" : "Budget famiglia aggiornato";
-  const body = action === "exceeded" ? `Il budget Famiglia per ${scope} è stato superato.` : `Il budget Famiglia per ${scope} è stato ${action === "created" ? "creato" : "aggiornato"} a ${formatEuro(budget.amount)}.`;
+  const body =
+    action === "exceeded"
+      ? `${actor.displayName} ha superato il budget famiglia per ${scope}.`
+      : `${actor.displayName} ha ${action === "created" ? "creato" : "modificato"} il budget famiglia.`;
+  const metadata = "month" in budget && typeof budget.month === "string" ? budgetMonthMetadata(budget.month) : {};
 
   return createHouseholdNotification(supabase, {
     householdId,
@@ -236,20 +275,31 @@ export async function notifyHouseholdBudget(supabase: SupabaseClient, householdI
     body,
     entityType: "budget",
     entityId: budget.id,
-    destinationUrl: `/family/settings?householdId=${householdId}`,
+    destinationUrl: "/notifications",
+    metadata,
     dedupeScope: action === "exceeded" ? `budget:${budget.id}:exceeded` : undefined
   });
 }
 
-export async function notifyFamilyEvent(supabase: SupabaseClient, householdId: string, type: "family_invite_accepted" | "family_invite_rejected" | "family_member_joined" | "family_member_removed" | "family_role_changed", title: string, body: string, dedupeScope?: string) {
+export async function notifyFamilyEvent(
+  supabase: SupabaseClient,
+  householdId: string,
+  type: "family_invite_accepted" | "family_invite_rejected" | "family_member_joined" | "family_member_removed" | "family_role_changed",
+  title: string,
+  body: string,
+  dedupeScope?: string,
+  actorUserId?: string
+) {
+  const actor = actorUserId ? await getNotificationActor(supabase, actorUserId) : defaultNotificationActor();
+
   return createHouseholdNotification(supabase, {
     householdId,
     type,
     title,
-    body,
+    body: familyNotificationBody(actor.displayName, type, body),
     entityType: "household",
     entityId: householdId,
-    destinationUrl: `/family?householdId=${householdId}`,
+    destinationUrl: "/family",
     dedupeScope
   });
 }
@@ -331,6 +381,85 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
 
+function defaultNotificationActor(): NotificationActor {
+  return {
+    id: "",
+    displayName: "Un membro della famiglia"
+  };
+}
+
+function shortDisplayName(fullName: unknown, username: unknown) {
+  const name = typeof fullName === "string" ? fullName.trim() : "";
+
+  if (name) {
+    return name.split(/\s+/)[0] || name;
+  }
+
+  const handle = typeof username === "string" ? username.trim() : "";
+  return handle || "Un membro della famiglia";
+}
+
+function movementNotificationBody(actorName: string, amount: string, isReimbursement: boolean, action: "created" | "updated" | "deleted") {
+  if (action === "deleted") {
+    return `${actorName} ha eliminato un movimento condiviso.`;
+  }
+
+  if (action === "updated") {
+    return `${actorName} ha modificato ${isReimbursement ? "un rimborso" : "un movimento"} condiviso.`;
+  }
+
+  if (isReimbursement) {
+    return `${actorName} ha registrato un rimborso condiviso di ${formatEuro(amount)}.`;
+  }
+
+  return `${actorName} ha aggiunto un movimento condiviso di ${formatEuro(amount)}.`;
+}
+
+function fundNotificationBody(actorName: string, fund: Fund, action: "created" | "updated" | "target_reached" | "target_exceeded" | "unshared") {
+  if (action === "created") {
+    return `${actorName} ha creato il fondo condiviso ${fund.name}.`;
+  }
+
+  if (action === "updated") {
+    return `${actorName} ha modificato il fondo condiviso ${fund.name}.`;
+  }
+
+  if (action === "unshared") {
+    return `${actorName} ha interrotto la condivisione del fondo ${fund.name}.`;
+  }
+
+  return `${actorName} ha aggiornato il fondo condiviso ${fund.name}: obiettivo ${action === "target_reached" ? "raggiunto" : "superato"}.`;
+}
+
+function familyNotificationBody(actorName: string, type: NotificationType, fallbackBody: string) {
+  if (type === "family_member_joined" || type === "family_invite_accepted") {
+    return `${actorName} ora fa parte della famiglia.`;
+  }
+
+  if (type === "family_invite_rejected") {
+    return `${actorName} ha rifiutato l'invito famiglia.`;
+  }
+
+  if (type === "family_role_changed") {
+    return `${actorName} ${fallbackBody}`;
+  }
+
+  return fallbackBody;
+}
+
+function budgetMonthMetadata(monthStart: string) {
+  const match = /^(\d{4})-(\d{2})-01$/.exec(monthStart);
+
+  if (!match) {
+    return {};
+  }
+
+  return {
+    year: match[1],
+    month: match[2]
+  };
+}
+
 function formatEuro(value: string) {
-  return new Intl.NumberFormat("it-IT", { currency: "EUR", style: "currency" }).format(Number(value));
+  return `€ ${new Intl.NumberFormat("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value))}`;
 }

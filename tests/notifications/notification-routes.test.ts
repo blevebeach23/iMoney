@@ -12,7 +12,7 @@ function notification(partial: Partial<AppNotification> = {}): AppNotification {
     title: "Notifica",
     body: "Corpo",
     entityType: "movement",
-    entityId: "movement-1",
+    entityId: "10000000-0000-4000-8000-000000000001",
     destinationUrl: null,
     isRead: false,
     readAt: null,
@@ -24,12 +24,18 @@ function notification(partial: Partial<AppNotification> = {}): AppNotification {
 
 describe("notification route mapping", () => {
   it("opens shared movement push notifications on an existing movement detail route", () => {
-    expect(resolveNotificationDestination(notification({ entityType: "movement", entityId: "movement-1" }))).toBe("/movements/movement-1");
+    expect(resolveNotificationDestination(notification({ entityType: "movement", entityId: "10000000-0000-4000-8000-000000000001" }))).toBe(
+      "/movements/10000000-0000-4000-8000-000000000001"
+    );
   });
 
   it("opens transfer and fund notifications on existing detail routes", () => {
-    expect(resolveNotificationDestination(notification({ type: "transfer_shared", entityType: "transfer", entityId: "transfer-1" }))).toBe("/transfers/transfer-1");
-    expect(resolveNotificationDestination(notification({ type: "fund_target_reached", entityType: "fund", entityId: "fund-1" }))).toBe("/funds/fund-1");
+    expect(resolveNotificationDestination(notification({ type: "transfer_shared", entityType: "transfer", entityId: "10000000-0000-4000-8000-000000000002" }))).toBe(
+      "/transfers/10000000-0000-4000-8000-000000000002"
+    );
+    expect(resolveNotificationDestination(notification({ type: "fund_target_reached", entityType: "fund", entityId: "10000000-0000-4000-8000-000000000003" }))).toBe(
+      "/funds/10000000-0000-4000-8000-000000000003"
+    );
   });
 
   it("opens budget notifications on the month route when metadata is available", () => {
@@ -43,10 +49,26 @@ describe("notification route mapping", () => {
   });
 
   it("does not open deleted/unshared entity detail routes", () => {
-    expect(resolveNotificationDestination(notification({ type: "movement_shared_deleted", entityType: "movement", entityId: "movement-1", destinationUrl: "/movements/movement-1" }))).toBe(
-      "/notifications"
-    );
-    expect(resolveNotificationDestination(notification({ type: "fund_unshared", entityType: "fund", entityId: "fund-1", destinationUrl: "/funds/fund-1" }))).toBe("/notifications");
+    expect(
+      resolveNotificationDestination(
+        notification({
+          type: "movement_shared_deleted",
+          entityType: "movement",
+          entityId: "10000000-0000-4000-8000-000000000001",
+          destinationUrl: "/movements/10000000-0000-4000-8000-000000000001"
+        })
+      )
+    ).toBe("/notifications");
+    expect(
+      resolveNotificationDestination(
+        notification({
+          type: "fund_unshared",
+          entityType: "fund",
+          entityId: "10000000-0000-4000-8000-000000000003",
+          destinationUrl: "/funds/10000000-0000-4000-8000-000000000003"
+        })
+      )
+    ).toBe("/notifications");
   });
 
   it("keeps family invite notifications in the notification center", () => {
@@ -56,6 +78,11 @@ describe("notification route mapping", () => {
   it("rejects external and unknown destinations", () => {
     expect(sanitizeNotificationDestination("https://evil.example/movements/1")).toBe("/notifications");
     expect(sanitizeNotificationDestination("/movement/movement-1")).toBe("/notifications");
-    expect(sanitizeNotificationDestination("/movements/movement-1")).toBe("/movements/movement-1");
+    expect(sanitizeNotificationDestination("/movements/movement-1")).toBe("/notifications");
+    expect(sanitizeNotificationDestination("/movements/10000000-0000-4000-8000-000000000001")).toBe("/movements/10000000-0000-4000-8000-000000000001");
+  });
+
+  it("rejects malformed destinations", () => {
+    expect(sanitizeNotificationDestination("http://[malformed")).toBe("/notifications");
   });
 });

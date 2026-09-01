@@ -87,13 +87,13 @@ export async function saveHouseholdBudgetAction(_prevState: FormState, formData:
   }
 
   try {
-    const { supabase } = await requireUser();
+    const { supabase, user } = await requireUser();
     if (parsed.data.id) {
       const budget = await updateHouseholdBudget(supabase, householdId, { ...parsed.data, id: parsed.data.id });
-      await notifyHouseholdBudget(supabase, householdId, budget, "updated");
+      await notifyHouseholdBudget(supabase, householdId, budget, "updated", user.id);
     } else {
       const budget = await createHouseholdBudget(supabase, householdId, parsed.data);
-      await notifyHouseholdBudget(supabase, householdId, budget, "created");
+      await notifyHouseholdBudget(supabase, householdId, budget, "created", user.id);
     }
   } catch (error) {
     return { ok: false, message: messageFromError(error) };

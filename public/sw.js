@@ -97,6 +97,13 @@ self.addEventListener("push", (event) => {
     }
   }
 
+  console.info("[sw] push payload received", {
+    title: payload.title || null,
+    type: payload.type || null,
+    notificationId: payload.notificationId || null,
+    url: payload.url || null
+  });
+
   event.waitUntil(
     self.registration.showNotification(payload.title || "iMoney", {
       body: payload.body || "Hai una nuova notifica.",
@@ -122,39 +129,56 @@ self.addEventListener("push", (event) => {
 });
 
 function normalizeNotificationUrl(value) {
+  let fallbackApplied = false;
+  let normalizedPath = "/notifications";
+
   try {
     const url = new URL(value || "/notifications", self.location.origin);
 
-    if (url.origin !== self.location.origin) {
-      return `${self.location.origin}/notifications`;
+    if (url.origin === self.location.origin && isKnownNotificationRoute(url.pathname)) {
+      normalizedPath = url.pathname;
+      if (url.pathname.startsWith("/budgets/")) {
+        normalizedPath = `${url.pathname}${url.search}`;
+      }
+    } else {
+      fallbackApplied = true;
     }
-
-    if (!isKnownNotificationRoute(url.pathname)) {
-      return `${self.location.origin}/notifications`;
-    }
-
-    return url.toString();
   } catch {
-    return `${self.location.origin}/notifications`;
+    fallbackApplied = true;
   }
+
+  console.info("[sw] notification url normalized", {
+    originalUrl: value || null,
+    normalizedPath,
+    fallbackApplied
+  });
+
+  return normalizedPath;
 }
 
 function isKnownNotificationRoute(pathname) {
   return (
     pathname === "/notifications" ||
     pathname === "/family" ||
-    pathname === "/family/settings" ||
-    pathname === "/budgets" ||
-    /^\/movements\/[^/]+$/.test(pathname) ||
-    /^\/transfers\/[^/]+$/.test(pathname) ||
-    /^\/funds\/[^/]+$/.test(pathname) ||
+    /^\/movements\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pathname) ||
+    /^\/transfers\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pathname) ||
+    /^\/funds\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pathname) ||
     /^\/budgets\/\d{4}\/\d{2}$/.test(pathname)
   );
 }
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const targetUrl = normalizeNotificationUrl(event.notification.data?.url);
+  const originalUrl = event.notification.data?.url;
+  const normalizedPath = normalizeNotificationUrl(originalUrl);
+  const targetUrl = new URL(normalizedPath, self.location.origin).toString();
+
+  console.info("[sw] notification click", {
+    data: event.notification.data || null,
+    originalUrl: originalUrl || null,
+    normalizedPath,
+    targetUrl
+  });
 
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
