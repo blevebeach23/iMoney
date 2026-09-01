@@ -74,6 +74,7 @@ export interface Movement {
   fixedExpenseId?: string | null;
   deletedAt: string | null;
   createdBy: string | null;
+  createdAt?: string | null;
   updatedBy: string | null;
 }
 
@@ -128,6 +129,7 @@ export interface Transfer {
   amount: MoneyAmount;
   occurredOn: string;
   description: string;
+  createdAt?: string | null;
   deletedAt: string | null;
 }
 

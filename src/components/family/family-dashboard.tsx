@@ -7,6 +7,7 @@ import type { MacroCategoryAggregate } from "@/lib/calculations/category-aggrega
 import type { MonthlySummary, MovementRequest } from "@/types/domain";
 import type { SharedHouseholdFund } from "@/services/funds/fund-service";
 import type { MovementListItem } from "@/services/movements/movement-service";
+import { familyTitle } from "@/lib/households/display-name";
 import { movementRequestStatusLabel } from "./movement-request-detail";
 
 function formatDate(value: string) {
@@ -46,13 +47,14 @@ export function FamilyDashboard({
 }>) {
   const pendingForMe = movementRequests.filter((request) => request.status === "PENDING" && request.recipientUserId === currentUserId);
   const sentByMe = movementRequests.filter((request) => request.createdByUserId === currentUserId);
+  const title = familyTitle(householdName);
 
   return (
     <main className="mx-auto min-h-dvh max-w-md px-4 pb-24 pt-5">
       <header className="pr-28">
         <div>
           <p className="text-sm font-semibold text-primary">{monthLabel}</p>
-          <h1 className="mt-1 text-3xl font-bold tracking-normal text-foreground">{householdName}</h1>
+          <h1 className="mt-1 text-3xl font-bold tracking-normal text-foreground">{title}</h1>
         </div>
       </header>
 

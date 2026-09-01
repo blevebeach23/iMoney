@@ -21,6 +21,7 @@ function movement(partial: Partial<MovementListItem> = {}): MovementListItem {
     importBatchId: null,
     deletedAt: null,
     createdBy: null,
+    createdAt: "2026-08-10T10:00:00.000Z",
     updatedBy: null,
     accountName: "Bank",
     categoryName: "Groceries",
@@ -42,6 +43,7 @@ function transfer(partial: Partial<TransferListItem> = {}): TransferListItem {
     amount: "75.00",
     occurredOn: "2026-08-15",
     description: "Transfer",
+    createdAt: "2026-08-15T10:00:00.000Z",
     deletedAt: null,
     fromName: "Bank",
     toName: "Cash",
@@ -56,6 +58,13 @@ describe("movement timeline", () => {
     const third = movement({ id: "movement-old", occurredOn: "2026-08-01" });
 
     expect(buildMovementTimeline([third, first], [second]).map((item) => item.id)).toEqual(["movement-new", "transfer-mid", "movement-old"]);
+  });
+
+  it("uses created_at descending as tie-break for same-day movement timeline items", () => {
+    const older = movement({ id: "movement-older", occurredOn: "2026-08-20", createdAt: "2026-08-20T08:00:00.000Z" });
+    const newer = movement({ id: "movement-newer", occurredOn: "2026-08-20", createdAt: "2026-08-20T09:00:00.000Z" });
+
+    expect(buildMovementTimeline([older, newer], []).map((item) => item.id)).toEqual(["movement-newer", "movement-older"]);
   });
 
   it("keeps movement and transfer items discriminated", () => {

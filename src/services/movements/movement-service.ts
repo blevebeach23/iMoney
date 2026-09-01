@@ -92,7 +92,8 @@ export async function getMonthlyMovements(
     .is("deleted_at", null)
     .gte("occurred_on", monthStart)
     .lte("occurred_on", monthEnd)
-    .order("occurred_on", { ascending: true });
+    .order("occurred_on", { ascending: false })
+    .order("created_at", { ascending: false });
 
   if (error) {
     throw error;
@@ -114,7 +115,8 @@ export async function getMovementsBetween(
     .is("deleted_at", null)
     .gte("occurred_on", startDate)
     .lte("occurred_on", endDate)
-    .order("occurred_on", { ascending: true });
+    .order("occurred_on", { ascending: false })
+    .order("created_at", { ascending: false });
 
   if (error) {
     throw error;
@@ -165,7 +167,8 @@ export async function getSharedHouseholdMovementsBetween(
     .is("deleted_at", null)
     .gte("occurred_on", startDate)
     .lte("occurred_on", endDate)
-    .order("occurred_on", { ascending: true });
+    .order("occurred_on", { ascending: false })
+    .order("created_at", { ascending: false });
 
   if (error) {
     throw error;
@@ -181,7 +184,8 @@ export async function getMovementsUntil(supabase: SupabaseClient, userId: string
     .eq("owner_user_id", userId)
     .is("deleted_at", null)
     .lte("occurred_on", cutoffDate)
-    .order("occurred_on", { ascending: true });
+    .order("occurred_on", { ascending: false })
+    .order("created_at", { ascending: false });
 
   if (error) {
     throw error;
@@ -392,6 +396,7 @@ function mapMovementRow(row: MovementRow): Movement {
     fixedExpenseId: row.fixed_expense_id ? String(row.fixed_expense_id) : null,
     deletedAt: row.deleted_at ? String(row.deleted_at) : null,
     createdBy: row.created_by ? String(row.created_by) : null,
+    createdAt: row.created_at ? String(row.created_at) : null,
     updatedBy: row.updated_by ? String(row.updated_by) : null
   };
 }

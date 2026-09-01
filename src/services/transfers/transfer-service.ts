@@ -21,7 +21,8 @@ export async function getTransfersUntil(supabase: SupabaseClient, userId: string
     .eq("owner_user_id", userId)
     .is("deleted_at", null)
     .lte("occurred_on", cutoffDate)
-    .order("occurred_on", { ascending: true });
+    .order("occurred_on", { ascending: false })
+    .order("created_at", { ascending: false });
 
   if (error) {
     throw error;
@@ -36,7 +37,8 @@ export async function getTransfers(supabase: SupabaseClient, userId: string, fil
     .select("*, from_account:accounts!transfers_from_account_id_fkey(name), to_account:accounts!transfers_to_account_id_fkey(name), from_fund:funds!transfers_from_fund_id_fkey(name), to_fund:funds!transfers_to_fund_id_fkey(name)")
     .eq("owner_user_id", userId)
     .is("deleted_at", null)
-    .order("occurred_on", { ascending: false });
+    .order("occurred_on", { ascending: false })
+    .order("created_at", { ascending: false });
 
   if (filters.period) {
     const [year, month] = filters.period.split("-");
@@ -155,6 +157,7 @@ function mapTransferRow(row: TransferRow): Transfer {
     amount: String(row.amount),
     occurredOn: String(row.occurred_on),
     description: String(row.description ?? ""),
+    createdAt: row.created_at ? String(row.created_at) : null,
     deletedAt: row.deleted_at ? String(row.deleted_at) : null
   };
 }

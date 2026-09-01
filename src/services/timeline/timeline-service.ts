@@ -21,16 +21,18 @@ export function buildMovementTimeline(movements: MovementListItem[], transfers: 
     ...movements.map((movement) => ({
       id: movement.id,
       kind: "movement" as const,
+      createdAt: movement.createdAt ?? "",
       occurredOn: movement.occurredOn,
       movement
     })),
     ...transfers.map((transfer) => ({
       id: transfer.id,
       kind: "transfer" as const,
+      createdAt: transfer.createdAt ?? "",
       occurredOn: transfer.occurredOn,
       transfer
     }))
-  ].sort((a, b) => b.occurredOn.localeCompare(a.occurredOn) || a.kind.localeCompare(b.kind) || a.id.localeCompare(b.id));
+  ].sort((a, b) => b.occurredOn.localeCompare(a.occurredOn) || b.createdAt.localeCompare(a.createdAt) || a.kind.localeCompare(b.kind) || a.id.localeCompare(b.id));
 }
 
 export function transfersCanBeShownWithMovementFilters(filters: {

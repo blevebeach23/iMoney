@@ -16,6 +16,14 @@ describe("notification and push configuration", () => {
     expect(migration).toContain("on conflict (dedupe_key)");
   });
 
+  it("excludes the notification actor from household movement notifications", () => {
+    const migration = readFileSync(join(root, "supabase", "migrations", "027_notifications_and_push.sql"), "utf8");
+    const service = readFileSync(join(root, "src", "services", "notifications", "notification-service.ts"), "utf8");
+
+    expect(migration).toContain("hm.user_id <> auth.uid()");
+    expect(service).toContain("await deliverPushForNotifications(created.map((item) => item.notification_id))");
+  });
+
   it("keeps push subscription RLS scoped to the authenticated owner", () => {
     const migration = readFileSync(join(root, "supabase", "migrations", "027_notifications_and_push.sql"), "utf8");
 
@@ -105,6 +113,13 @@ describe("notification and push configuration", () => {
     expect(service).toContain("createSupabaseAdminClient()");
     expect(pushSettings).toContain("registration.pushManager.getSubscription()");
     expect(pushSettings).toContain("existingSubscription ??");
+  });
+
+  it("does not expose the technical push subscription counter in the settings UI", () => {
+    const pushSettings = readFileSync(join(root, "src", "components", "notifications", "push-settings.tsx"), "utf8");
+
+    expect(pushSettings).toContain("activeSubscriptionCount");
+    expect(pushSettings).not.toContain("{activeSubscriptionCount}</span>");
   });
 
   it("updates the top-right unread badge from the shared realtime notification provider", () => {

@@ -7,6 +7,7 @@ import { calculateCategoryAggregates } from "@/lib/calculations/category-aggrega
 import { formatMonthLabel, formatYearMonth, monthRangeFromYearMonth } from "@/lib/calculations/dates";
 import { calculateMonthlySummary } from "@/lib/calculations/monthly-summary";
 import { getUpcomingMovements } from "@/lib/calculations/upcoming";
+import { shortUserName } from "@/lib/profiles/display-name";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAccounts } from "@/services/accounts/account-service";
 import { getPersonalBudgetsForMonth } from "@/services/budgets/budget-service";
@@ -33,7 +34,7 @@ export default async function Home({ searchParams }: Readonly<{ searchParams: Re
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("onboarding_completed")
+    .select("full_name, onboarding_completed, username")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -59,6 +60,7 @@ export default async function Home({ searchParams }: Readonly<{ searchParams: Re
   const categoryAggregates = calculateCategoryAggregates(monthMovements, categoryInfo);
   const upcomingMovements = getUpcomingMovements(monthMovements, range.today);
   const annualTrend = calculateAnnualTrend(yearMovements, year);
+  const userName = shortUserName(profile?.full_name, profile?.username);
 
   return (
     <>
@@ -76,6 +78,7 @@ export default async function Home({ searchParams }: Readonly<{ searchParams: Re
         selectedMonth={range.yearMonth}
         summary={summary}
         upcomingMovements={upcomingMovements}
+        userName={userName}
       />
     </>
   );

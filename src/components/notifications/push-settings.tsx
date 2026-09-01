@@ -131,7 +131,6 @@ export function PushSettings({ activeSubscriptionCount, vapidPublicKey }: Readon
           <h2 className="text-lg font-semibold text-foreground">Notifiche push</h2>
           <p className="mt-1 text-sm text-zinc-600">{label}</p>
         </div>
-        <span className="rounded-md bg-zinc-100 px-2 py-1 text-xs font-semibold">{activeSubscriptionCount}</span>
       </div>
       <div className="mt-4 grid grid-cols-2 gap-2">
         <button

@@ -77,6 +77,38 @@ describe("notification service", () => {
     }));
   });
 
+  it("creates a household notification when a shared movement is updated", async () => {
+    const supabase = rpcSupabase();
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await notifySharedMovement(
+      supabase,
+      {
+        amount: "52.00",
+        categoryName: "Spesa alimentare",
+        description: "Spesa",
+        householdId: "household-1",
+        id: "10000000-0000-4000-8000-000000000001",
+        isSharedWithHousehold: true,
+        type: "expense"
+      },
+      "updated",
+      "actor-1"
+    );
+
+    expect(supabase.rpc).toHaveBeenCalledWith(
+      "create_household_notifications",
+      expect.objectContaining({
+        target_household_id: "household-1",
+        notification_type: "movement_shared_updated",
+        notification_title: "Movimento condiviso aggiornato",
+        notification_body: "Vito ha modificato un movimento condiviso.",
+        destination_url: "/family/movements/10000000-0000-4000-8000-000000000001",
+        dedupe_scope: "movement:10000000-0000-4000-8000-000000000001:updated"
+      })
+    );
+  });
+
   it("does not create notifications for private movements", async () => {
     const supabase = rpcSupabase();
 
@@ -92,6 +124,28 @@ describe("notification service", () => {
           type: "expense"
         },
         "created"
+      )
+    ).resolves.toEqual([]);
+
+    expect(supabase.rpc).not.toHaveBeenCalled();
+  });
+
+  it("does not create family notifications when a private movement is updated", async () => {
+    const supabase = rpcSupabase();
+
+    await expect(
+      notifySharedMovement(
+        supabase,
+        {
+          amount: "52.00",
+          description: "Spesa",
+          householdId: null,
+          id: "10000000-0000-0000-0000-000000000001",
+          isSharedWithHousehold: false,
+          type: "expense"
+        },
+        "updated",
+        "actor-1"
       )
     ).resolves.toEqual([]);
 

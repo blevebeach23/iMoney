@@ -97,6 +97,7 @@ interface DashboardPreviewProps {
   selectedMonth?: string;
   summary?: MonthlySummary;
   upcomingMovements?: Movement[];
+  userName?: string;
 }
 
 function formatDate(value: string) {
@@ -115,7 +116,8 @@ export function DashboardPreview({
   monthLabel = "Agosto 2026",
   selectedMonth = "2026-08",
   summary,
-  upcomingMovements = []
+  upcomingMovements = [],
+  userName = "Utente"
 }: DashboardPreviewProps) {
   const monthlySummary = summary ?? calculateMonthlySummary(sampleMovements);
   const cashRows = balances?.cash ?? [{ id: "cash", name: "Contanti", balance: "0.00" }];
@@ -131,7 +133,7 @@ export function DashboardPreview({
           <Link href={`/months/${selectedMonth}`} className="text-sm font-medium text-primary">
             {monthLabel}
           </Link>
-          <h1 className="mt-1 text-3xl font-bold tracking-normal text-foreground">Rendiconto</h1>
+          <h1 className="mt-1 text-3xl font-bold tracking-normal text-foreground">Rendiconto {userName}</h1>
         </div>
       </header>
 
