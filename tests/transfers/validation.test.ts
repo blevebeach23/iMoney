@@ -16,6 +16,8 @@ function validTransfer(overrides: Record<string, unknown> = {}) {
     toFundId: null,
     amount: "50.00",
     description: "",
+    sharedWithFamily: false,
+    householdId: null,
     ...overrides
   };
 }
@@ -62,6 +64,11 @@ describe("transfer validation", () => {
 
   it("rejects non-positive amounts", () => {
     expect(transferFormSchema.safeParse(validTransfer({ amount: "0.00" })).success).toBe(false);
+  });
+
+  it("requires a household when sharing with family", () => {
+    expect(transferFormSchema.safeParse(validTransfer({ sharedWithFamily: true, householdId: null })).success).toBe(false);
+    expect(transferFormSchema.safeParse(validTransfer({ sharedWithFamily: true, householdId: crypto.randomUUID() })).success).toBe(true);
   });
 
   it("parses transfer containers", () => {

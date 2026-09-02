@@ -50,6 +50,7 @@ export function MovementFiltersForm({
           <option value="expense">Spese</option>
           <option value="income">Entrate</option>
           <option value="reimbursement">Rimborsi</option>
+          <option value="transfer">Trasferimenti</option>
         </select>
         <select name="shared" defaultValue={filters.shared ?? "all"} className="h-11 rounded-md border border-border px-3">
           <option value="all">Condivisione</option>
@@ -178,6 +179,12 @@ function TransferTimelineCard({ item }: Readonly<{ item: Extract<TimelineItem, {
             <ArrowRightLeft aria-hidden className="h-3 w-3" />
             Trasferimento
           </span>
+          {transfer.isSharedWithHousehold && (
+            <span className="inline-flex items-center gap-1 rounded-md bg-sky-50 px-2 py-1 text-sky-700">
+              <Share2 aria-hidden className="h-3 w-3" />
+              Famiglia
+            </span>
+          )}
           {isFuture(transfer.occurredOn) && <span className="rounded-md bg-amber-50 px-2 py-1 text-amber-700">Programmato</span>}
         </div>
       </Link>

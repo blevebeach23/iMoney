@@ -29,12 +29,18 @@ export const transferFormSchema = z
       .regex(/^\d+([.,]\d{1,2})?$/, "Importo positivo con massimo due decimali")
       .transform((value) => value.replace(",", "."))
       .refine((value) => Number(value) > 0, "Importo deve essere maggiore di zero"),
-    description: z.string().trim().max(160, "Descrizione troppo lunga").default("")
+    description: z.string().trim().max(160, "Descrizione troppo lunga").default(""),
+    sharedWithFamily: z.coerce.boolean().default(false),
+    householdId: z.string().uuid().nullable().default(null)
   })
   .and(containerSchema)
   .refine((value) => value.fromContainerId !== value.toContainerId, {
     message: "Origine e destinazione devono essere diverse",
     path: ["toContainerId"]
+  })
+  .refine((value) => !value.sharedWithFamily || Boolean(value.householdId), {
+    message: "Seleziona una famiglia per condividere il trasferimento",
+    path: ["sharedWithFamily"]
   });
 
 export type TransferFormInput = z.infer<typeof transferFormSchema>;

@@ -7,7 +7,7 @@ type MovementRow = Record<string, unknown>;
 
 export interface MovementFilters {
   period?: string;
-  type?: "all" | Movement["type"];
+  type?: "all" | Movement["type"] | "transfer";
   macroCategoryId?: string;
   categoryId?: string;
   containerId?: string;
@@ -24,6 +24,10 @@ export interface MovementListItem extends Movement {
 }
 
 export async function getMovements(supabase: SupabaseClient, userId: string, filters: MovementFilters = {}): Promise<MovementListItem[]> {
+  if (filters.type === "transfer") {
+    return [];
+  }
+
   let query = supabase
     .from("movements")
     .select("*, categories(name, macro_categories(id, name)), accounts(name), funds(name)")

@@ -164,6 +164,7 @@ export interface Transfer {
   amount: MoneyAmount;
   occurredOn: string;
   description: string;
+  isSharedWithHousehold: boolean;
   createdAt?: string | null;
   deletedAt: string | null;
   creditCardAccountId?: string | null;

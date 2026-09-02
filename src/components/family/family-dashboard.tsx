@@ -1,4 +1,4 @@
-import { Share2 } from "lucide-react";
+import { ArrowRightLeft, Share2 } from "lucide-react";
 import Link from "next/link";
 import { BudgetProgress } from "@/components/budgets/budget-progress";
 import type { AnnualTrendPoint } from "@/lib/calculations/annual-trend";
@@ -7,6 +7,7 @@ import type { MacroCategoryAggregate } from "@/lib/calculations/category-aggrega
 import type { FixedExpenseRequest, MonthlySummary, MovementRequest } from "@/types/domain";
 import type { SharedHouseholdFund } from "@/services/funds/fund-service";
 import type { MovementListItem } from "@/services/movements/movement-service";
+import type { TimelineItem } from "@/services/timeline/timeline-service";
 import { familyTitle } from "@/lib/households/display-name";
 import { fixedExpenseRequestStatusLabel } from "./fixed-expense-request-detail";
 import { movementRequestStatusLabel } from "./movement-request-detail";
@@ -46,7 +47,7 @@ export function FamilyDashboard({
   selectedMonth: string;
   sharedFunds: SharedHouseholdFund[];
   summary: MonthlySummary;
-  timeline: MovementListItem[];
+  timeline: TimelineItem[];
 }>) {
   const pendingForMe = movementRequests.filter((request) => request.status === "PENDING" && request.recipientUserId === currentUserId);
   const sentByMe = movementRequests.filter((request) => request.createdByUserId === currentUserId);
@@ -137,26 +138,9 @@ export function FamilyDashboard({
       <section className="mt-6 space-y-3">
         <h2 className="text-lg font-semibold text-foreground">Timeline famiglia</h2>
         {timeline.length === 0 ? (
-          <p className="rounded-md border border-dashed border-border bg-white p-4 text-sm text-zinc-600">Nessun movimento condiviso.</p>
+          <p className="rounded-md border border-dashed border-border bg-white p-4 text-sm text-zinc-600">Nessuna operazione condivisa.</p>
         ) : (
-          timeline.map((movement) => (
-            <Link key={movement.id} href={`/family/movements/${movement.id}`} className="block rounded-md border border-border bg-white p-4 shadow-panel">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-zinc-500">{formatDate(movement.occurredOn)}</p>
-                  <h3 className="mt-1 font-bold tracking-normal">{movement.description}</h3>
-                  <p className="mt-1 text-sm text-zinc-600">{movement.authorName ?? movement.ownerUserId}</p>
-                </div>
-                <p className={`font-bold tabular-nums ${movement.type === "expense" ? "text-red-700" : "text-emerald-700"}`}>
-                  {movementSign(movement.type)}EUR {movement.amount}
-                </p>
-              </div>
-              <span className="mt-3 inline-flex items-center gap-1 rounded-md bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-700">
-                <Share2 aria-hidden className="h-3 w-3" />
-                Condiviso
-              </span>
-            </Link>
-          ))
+          timeline.map((item) => (item.kind === "movement" ? <FamilyMovementTimelineCard key={`movement:${item.id}`} movement={item.movement} /> : <FamilyTransferTimelineCard key={`transfer:${item.id}`} transfer={item.transfer} />))
         )}
       </section>
 
@@ -176,6 +160,48 @@ export function FamilyDashboard({
         </div>
       </section>
     </main>
+  );
+}
+
+function FamilyMovementTimelineCard({ movement }: Readonly<{ movement: MovementListItem }>) {
+  return (
+    <Link href={`/family/movements/${movement.id}`} className="block rounded-md border border-border bg-white p-4 shadow-panel">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-zinc-500">{formatDate(movement.occurredOn)}</p>
+          <h3 className="mt-1 font-bold tracking-normal">{movement.description}</h3>
+          <p className="mt-1 text-sm text-zinc-600">{movement.authorName ?? movement.ownerUserId}</p>
+        </div>
+        <p className={`font-bold tabular-nums ${movement.type === "expense" ? "text-red-700" : "text-emerald-700"}`}>
+          {movementSign(movement.type)}EUR {movement.amount}
+        </p>
+      </div>
+      <span className="mt-3 inline-flex items-center gap-1 rounded-md bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-700">
+        <Share2 aria-hidden className="h-3 w-3" />
+        Condiviso
+      </span>
+    </Link>
+  );
+}
+
+function FamilyTransferTimelineCard({ transfer }: Readonly<{ transfer: Extract<TimelineItem, { kind: "transfer" }>["transfer"] }>) {
+  return (
+    <Link href={`/family/transfers/${transfer.id}`} className="block rounded-md border border-border bg-white p-4 shadow-panel">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-zinc-500">{formatDate(transfer.occurredOn)}</p>
+          <h3 className="mt-1 font-bold tracking-normal">{transfer.description || "Trasferimento"}</h3>
+          <p className="mt-1 text-sm text-zinc-600">
+            {transfer.fromName} verso {transfer.toName}
+          </p>
+        </div>
+        <p className="font-bold tabular-nums text-primary">EUR {transfer.amount}</p>
+      </div>
+      <span className="mt-3 inline-flex items-center gap-1 rounded-md bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-700">
+        <ArrowRightLeft aria-hidden className="h-3 w-3" />
+        Trasferimento condiviso
+      </span>
+    </Link>
   );
 }
 

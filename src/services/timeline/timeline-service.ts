@@ -36,18 +36,17 @@ export function buildMovementTimeline(movements: MovementListItem[], transfers: 
 }
 
 export function transfersCanBeShownWithMovementFilters(filters: {
-  type?: "all" | "income" | "expense" | "reimbursement";
+  type?: "all" | "income" | "expense" | "reimbursement" | "transfer";
   macroCategoryId?: string;
   categoryId?: string;
   reimbursement?: "all" | "yes" | "no";
   shared?: "all" | "yes" | "no";
 }): boolean {
   return (
-    (!filters.type || filters.type === "all") &&
+    (!filters.type || filters.type === "all" || filters.type === "transfer") &&
     !filters.macroCategoryId &&
     !filters.categoryId &&
-    (!filters.reimbursement || filters.reimbursement === "all") &&
-    (!filters.shared || filters.shared === "all")
+    (!filters.reimbursement || filters.reimbursement === "all")
   );
 }
 

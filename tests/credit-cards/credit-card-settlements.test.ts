@@ -59,6 +59,7 @@ function transfer(partial: Partial<Transfer> = {}): Transfer {
     amount: "100.00",
     occurredOn: "2026-10-05",
     description: "Addebito Carta",
+    isSharedWithHousehold: false,
     deletedAt: null,
     ...partial
   };

@@ -3,6 +3,7 @@ import { TransferForm } from "@/components/transfers/transfer-form";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAccounts } from "@/services/accounts/account-service";
 import { getFunds } from "@/services/funds/fund-service";
+import { getActiveHouseholdOptions } from "@/services/households/household-service";
 import { getTransferById } from "@/services/transfers/transfer-service";
 
 export const dynamic = "force-dynamic";
@@ -17,9 +18,10 @@ export default async function EditTransferPage({ params }: Readonly<{ params: { 
     redirect("/login");
   }
 
-  const [accounts, funds, transfer] = await Promise.all([
+  const [accounts, funds, households, transfer] = await Promise.all([
     getAccounts(supabase, user.id),
     getFunds(supabase, user.id),
+    getActiveHouseholdOptions(supabase, user.id),
     getTransferById(supabase, user.id, params.id)
   ]);
 
@@ -33,7 +35,7 @@ export default async function EditTransferPage({ params }: Readonly<{ params: { 
         <p className="text-sm font-semibold text-primary">Trasferimenti</p>
         <h1 className="mt-2 text-3xl font-bold tracking-normal text-foreground">Modifica trasferimento</h1>
       </header>
-      <TransferForm accounts={accounts} funds={funds} transfer={transfer} />
+      <TransferForm accounts={accounts} funds={funds} households={households} transfer={transfer} />
     </main>
   );
 }

@@ -37,7 +37,9 @@ function formDataToTransferObject(formData: FormData) {
     toAccountId: to.accountId,
     toFundId: to.fundId,
     amount: String(formData.get("amount") ?? ""),
-    description: String(formData.get("description") ?? "")
+    description: String(formData.get("description") ?? ""),
+    sharedWithFamily: formData.get("sharedWithFamily") === "on",
+    householdId: String(formData.get("householdId") ?? "") || null
   };
 }
 

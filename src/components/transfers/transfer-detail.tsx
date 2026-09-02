@@ -1,4 +1,4 @@
-import { ArrowRightLeft, Pencil } from "lucide-react";
+import { ArrowRightLeft, Pencil, Share2 } from "lucide-react";
 import Link from "next/link";
 import type { TransferListItem } from "@/services/transfers/transfer-service";
 import { DeleteTransferForm } from "./delete-transfer-form";
@@ -7,7 +7,7 @@ function formatDate(value: string) {
   return new Intl.DateTimeFormat("it-IT").format(new Date(`${value}T00:00:00`));
 }
 
-export function TransferDetail({ transfer }: Readonly<{ transfer: TransferListItem }>) {
+export function TransferDetail({ readOnly = false, transfer }: Readonly<{ readOnly?: boolean; transfer: TransferListItem }>) {
   return (
     <div className="space-y-4">
       <article className="rounded-md border border-border bg-white p-4">
@@ -30,13 +30,26 @@ export function TransferDetail({ transfer }: Readonly<{ transfer: TransferListIt
             <dt className="font-semibold text-zinc-500">Destinazione</dt>
             <dd>{transfer.toName}</dd>
           </div>
+          {transfer.isSharedWithHousehold && (
+            <div>
+              <dt className="font-semibold text-zinc-500">Condivisione</dt>
+              <dd className="inline-flex items-center gap-2">
+                <Share2 aria-hidden className="h-4 w-4" />
+                Famiglia
+              </dd>
+            </div>
+          )}
         </dl>
       </article>
-      <Link href={`/transfers/${transfer.id}/edit`} className="flex min-h-11 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-white">
-        <Pencil aria-hidden className="h-4 w-4" />
-        Modifica
-      </Link>
-      <DeleteTransferForm transferId={transfer.id} />
+      {!readOnly && (
+        <>
+          <Link href={`/transfers/${transfer.id}/edit`} className="flex min-h-11 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-white">
+            <Pencil aria-hidden className="h-4 w-4" />
+            Modifica
+          </Link>
+          <DeleteTransferForm transferId={transfer.id} />
+        </>
+      )}
     </div>
   );
 }

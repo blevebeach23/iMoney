@@ -12,6 +12,7 @@ export interface TransferListItem extends Transfer {
 export interface TransferFilters {
   period?: string;
   containerId?: string;
+  shared?: "all" | "yes" | "no";
 }
 
 export async function getTransfersUntil(supabase: SupabaseClient, userId: string, cutoffDate: string): Promise<Transfer[]> {
@@ -57,6 +58,12 @@ export async function getTransfers(supabase: SupabaseClient, userId: string, fil
     query = query.or(`from_fund_id.eq.${fundId},to_fund_id.eq.${fundId}`);
   }
 
+  if (filters.shared === "yes") {
+    query = query.eq("shared_with_family", true);
+  } else if (filters.shared === "no") {
+    query = query.eq("shared_with_family", false);
+  }
+
   const { data, error } = await query;
 
   if (error) {
@@ -72,6 +79,50 @@ export async function getTransferById(supabase: SupabaseClient, userId: string, 
     .select("*, from_account:accounts!transfers_from_account_id_fkey(name), to_account:accounts!transfers_to_account_id_fkey(name), from_fund:funds!transfers_from_fund_id_fkey(name), to_fund:funds!transfers_to_fund_id_fkey(name)")
     .eq("id", transferId)
     .eq("owner_user_id", userId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data ? mapTransferListRow(data) : null;
+}
+
+export async function getSharedHouseholdTransfers(
+  supabase: SupabaseClient,
+  householdId: string,
+  monthStart?: string,
+  monthEnd?: string
+): Promise<TransferListItem[]> {
+  let query = supabase
+    .from("transfers")
+    .select("*, from_account:accounts!transfers_from_account_id_fkey(name), to_account:accounts!transfers_to_account_id_fkey(name), from_fund:funds!transfers_from_fund_id_fkey(name), to_fund:funds!transfers_to_fund_id_fkey(name)")
+    .eq("household_id", householdId)
+    .eq("shared_with_family", true)
+    .is("deleted_at", null)
+    .order("occurred_on", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (monthStart && monthEnd) {
+    query = query.gte("occurred_on", monthStart).lte("occurred_on", monthEnd);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).map(mapTransferListRow);
+}
+
+export async function getSharedHouseholdTransferById(supabase: SupabaseClient, transferId: string): Promise<TransferListItem | null> {
+  const { data, error } = await supabase
+    .from("transfers")
+    .select("*, from_account:accounts!transfers_from_account_id_fkey(name), to_account:accounts!transfers_to_account_id_fkey(name), from_fund:funds!transfers_from_fund_id_fkey(name), to_fund:funds!transfers_to_fund_id_fkey(name)")
+    .eq("id", transferId)
+    .eq("shared_with_family", true)
     .is("deleted_at", null)
     .maybeSingle();
 
@@ -121,7 +172,8 @@ export async function softDeleteTransfer(supabase: SupabaseClient, userId: strin
 function toTransferPayload(userId: string, input: TransferFormInput) {
   return {
     owner_user_id: userId,
-    household_id: null,
+    household_id: input.sharedWithFamily ? input.householdId : null,
+    shared_with_family: input.sharedWithFamily,
     from_account_id: input.fromAccountId,
     to_account_id: input.toAccountId,
     from_fund_id: input.fromFundId,
@@ -157,6 +209,7 @@ function mapTransferRow(row: TransferRow): Transfer {
     amount: String(row.amount),
     occurredOn: String(row.occurred_on),
     description: String(row.description ?? ""),
+    isSharedWithHousehold: Boolean(row.shared_with_family),
     createdAt: row.created_at ? String(row.created_at) : null,
     deletedAt: row.deleted_at ? String(row.deleted_at) : null,
     creditCardAccountId: row.credit_card_account_id ? String(row.credit_card_account_id) : null,

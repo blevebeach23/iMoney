@@ -37,12 +37,14 @@ export default async function MovementsPage({ searchParams }: Readonly<{ searchP
   };
 
   const showTransfers = transfersCanBeShownWithMovementFilters(filters);
+  const showMovements = filters.type !== "transfer";
+  const movementFilters: MovementFilters = filters.type === "transfer" ? { ...filters, type: "all" } : filters;
   const [accounts, funds, categoryTree, movements, transfers] = await Promise.all([
     getAccounts(supabase, user.id),
     getFunds(supabase, user.id),
     getCategoryTree(supabase, user.id),
-    getMovements(supabase, user.id, filters),
-    showTransfers ? getTransfers(supabase, user.id, { period: filters.period, containerId: filters.containerId }) : Promise.resolve([])
+    showMovements ? getMovements(supabase, user.id, movementFilters) : Promise.resolve([]),
+    showTransfers ? getTransfers(supabase, user.id, { period: filters.period, containerId: filters.containerId, shared: filters.shared }) : Promise.resolve([])
   ]);
   const timeline = buildMovementTimeline(movements, transfers);
 

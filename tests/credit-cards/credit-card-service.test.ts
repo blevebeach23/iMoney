@@ -71,6 +71,7 @@ function transfer(partial: Partial<Transfer> = {}): Transfer {
     amount: "100.00",
     occurredOn: "2026-10-05",
     description: "Addebito Carta Visa",
+    isSharedWithHousehold: false,
     deletedAt: null,
     creditCardAccountId: "card-1",
     creditCardCycleStartOn: "2026-09-01",
@@ -161,6 +162,7 @@ describe("credit card service", () => {
       amount: "100.00",
       credit_card_account_id: "card-1",
       from_account_id: "bank-1",
+      shared_with_family: false,
       to_account_id: "card-1"
     }));
 
@@ -226,5 +228,6 @@ describe("credit card service", () => {
       ["bank-1", "card-2", "50.00"],
       ["bank-2", "card-3", "75.00"]
     ]);
+    expect(virtual.every((item) => item.isSharedWithHousehold === false && item.householdId === null)).toBe(true);
   });
 });

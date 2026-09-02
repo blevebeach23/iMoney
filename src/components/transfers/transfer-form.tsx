@@ -7,6 +7,7 @@ import { FormMessage, PendingButton, SelectField, TextField } from "@/components
 import type { FormState } from "@/lib/auth/validation";
 import { saveTransferAction } from "@/lib/transfers/actions";
 import type { Account, Fund } from "@/types/domain";
+import type { ActiveHouseholdOption } from "@/services/households/household-service";
 import type { TransferListItem } from "@/services/transfers/transfer-service";
 
 const initialState: FormState = { ok: false };
@@ -18,12 +19,19 @@ function containerOptions(accounts: Account[], funds: Fund[]) {
   ];
 }
 
-export function TransferForm({ accounts, funds, transfer }: Readonly<{ accounts: Account[]; funds: Fund[]; transfer?: TransferListItem }>) {
+export function TransferForm({
+  accounts,
+  funds,
+  households,
+  transfer
+}: Readonly<{ accounts: Account[]; funds: Fund[]; households: ActiveHouseholdOption[]; transfer?: TransferListItem }>) {
   const [state, action] = useFormState(saveTransferAction, initialState);
   const today = new Date().toISOString().slice(0, 10);
   const containers = containerOptions(accounts, funds);
   const fromValue = transfer?.fromAccountId ? `account:${transfer.fromAccountId}` : transfer?.fromFundId ? `fund:${transfer.fromFundId}` : containers[0]?.value;
   const toValue = transfer?.toAccountId ? `account:${transfer.toAccountId}` : transfer?.toFundId ? `fund:${transfer.toFundId}` : containers[1]?.value;
+  const household = transfer?.householdId ? households.find((item) => item.id === transfer.householdId) : households[0];
+  const shareByDefault = transfer ? transfer.isSharedWithHousehold : Boolean(household?.shareByDefault);
 
   if (containers.length < 2) {
     return (
@@ -54,6 +62,13 @@ export function TransferForm({ accounts, funds, transfer }: Readonly<{ accounts:
       <SelectField label="Destinazione" name="toContainerId" defaultValue={toValue} options={containers} errors={state.fieldErrors} />
       <TextField label="Importo" name="amount" defaultValue={transfer?.amount ?? ""} inputMode="decimal" errors={state.fieldErrors} />
       <TextField label="Descrizione" name="description" defaultValue={transfer?.description ?? ""} placeholder="Opzionale" errors={state.fieldErrors} />
+      {household && (
+        <label className="flex min-h-11 items-center gap-3 rounded-md border border-border bg-white px-3 text-sm font-semibold">
+          <input type="hidden" name="householdId" value={household.id} />
+          <input name="sharedWithFamily" type="checkbox" defaultChecked={shareByDefault} className="h-4 w-4 rounded border-border text-primary" />
+          Condividi con la famiglia
+        </label>
+      )}
       <PendingButton>
         <Save aria-hidden className="h-4 w-4" />
         Salva trasferimento

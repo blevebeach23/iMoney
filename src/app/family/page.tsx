@@ -14,6 +14,8 @@ import { getSharedHouseholdFunds } from "@/services/funds/fund-service";
 import { getMovementCategoryInfo, getSharedHouseholdMovements, getSharedHouseholdMovementsBetween } from "@/services/movements/movement-service";
 import { getActiveHouseholds, getHouseholdById } from "@/services/households/household-service";
 import { getMovementRequestsForHousehold } from "@/services/movements/movement-request-service";
+import { buildMovementTimeline } from "@/services/timeline/timeline-service";
+import { getSharedHouseholdTransfers } from "@/services/transfers/transfer-service";
 
 export const dynamic = "force-dynamic";
 
@@ -55,10 +57,11 @@ export default async function FamilyPage({ searchParams }: Readonly<{ searchPara
   const selectedMonth = firstParam(searchParams.month) ?? formatYearMonth(new Date());
   const range = monthRangeFromYearMonth(selectedMonth);
   const year = Number(range.yearMonth.slice(0, 4));
-  const [household, monthMovements, yearMovements, budgets, categoryInfo, sharedFunds, movementRequests, fixedExpenseRequests] = await Promise.all([
+  const [household, monthMovements, yearMovements, monthTransfers, budgets, categoryInfo, sharedFunds, movementRequests, fixedExpenseRequests] = await Promise.all([
     getHouseholdById(supabase, selectedHouseholdId),
     getSharedHouseholdMovements(supabase, selectedHouseholdId, range.monthStart, range.monthEnd),
     getSharedHouseholdMovementsBetween(supabase, selectedHouseholdId, `${year}-01-01`, `${year}-12-31`),
+    getSharedHouseholdTransfers(supabase, selectedHouseholdId, range.monthStart, range.monthEnd),
     getHouseholdBudgetsForMonth(supabase, selectedHouseholdId, range.monthStart),
     getMovementCategoryInfo(supabase, user.id),
     getSharedHouseholdFunds(supabase, selectedHouseholdId),
@@ -76,6 +79,7 @@ export default async function FamilyPage({ searchParams }: Readonly<{ searchPara
   const aggregates = calculateCategoryAggregates(visibleMonthMovements, categoryInfo);
   const budgetReport = calculateBudgetReport(budgets, visibleMonthMovements, categoryInfo);
   const annualTrend = calculateAnnualTrend(visibleYearMovements, year);
+  const familyTimeline = buildMovementTimeline(visibleMonthMovements, monthTransfers);
 
   return (
     <FamilyDashboard
@@ -91,7 +95,7 @@ export default async function FamilyPage({ searchParams }: Readonly<{ searchPara
       selectedMonth={range.yearMonth}
       sharedFunds={sharedFunds}
       summary={summary}
-      timeline={visibleMonthMovements}
+      timeline={familyTimeline}
     />
   );
 }

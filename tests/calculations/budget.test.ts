@@ -99,6 +99,7 @@ describe("budget usage", () => {
         amount: "900.00",
         occurredOn: "2026-08-15",
         description: "Transfer",
+        isSharedWithHousehold: true,
         deletedAt: null
       }
     ];

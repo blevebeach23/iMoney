@@ -43,6 +43,7 @@ function transfer(partial: Partial<TransferListItem> = {}): TransferListItem {
     amount: "75.00",
     occurredOn: "2026-08-15",
     description: "Transfer",
+    isSharedWithHousehold: false,
     createdAt: "2026-08-15T10:00:00.000Z",
     deletedAt: null,
     fromName: "Bank",
@@ -97,7 +98,17 @@ describe("movement timeline", () => {
 
   it("shows transfers only with compatible movement filters", () => {
     expect(transfersCanBeShownWithMovementFilters({ type: "all", reimbursement: "all", shared: "all" })).toBe(true);
+    expect(transfersCanBeShownWithMovementFilters({ type: "transfer", reimbursement: "all", shared: "all" })).toBe(true);
     expect(transfersCanBeShownWithMovementFilters({ type: "expense", reimbursement: "all", shared: "all" })).toBe(false);
+    expect(transfersCanBeShownWithMovementFilters({ type: "income", reimbursement: "all", shared: "all" })).toBe(false);
+    expect(transfersCanBeShownWithMovementFilters({ type: "reimbursement", reimbursement: "all", shared: "all" })).toBe(false);
     expect(transfersCanBeShownWithMovementFilters({ type: "all", categoryId: crypto.randomUUID(), reimbursement: "all", shared: "all" })).toBe(false);
+  });
+
+  it("keeps shared transfers outside economic aggregates", () => {
+    const summary = calculateTimelineEconomicSummary(buildMovementTimeline([movement({ type: "expense", amount: "80.00" })], [transfer({ amount: "300.00", isSharedWithHousehold: true })]));
+
+    expect(summary.grossExpenses).toBe("80.00");
+    expect(summary.netExpenses).toBe("80.00");
   });
 });
