@@ -4,10 +4,11 @@ import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { deleteMovementAction } from "@/lib/movements/actions";
 
-export function DeleteMovementForm({ movementId }: Readonly<{ movementId: string }>) {
+export function DeleteMovementForm({ movementId, returnTo = "/movements" }: Readonly<{ movementId: string; returnTo?: string }>) {
   return (
     <form action={deleteMovementAction}>
       <input type="hidden" name="id" value={movementId} />
+      <input type="hidden" name="returnTo" value={returnTo} />
       <Button
         type="submit"
         variant="secondary"

@@ -14,11 +14,11 @@ export function FixedExpenseList({
   if (fixedExpenses.length === 0) {
     return (
       <div className="rounded-md border border-dashed border-border bg-white p-5">
-        <p className="font-semibold text-foreground">Nessuna spesa fissa</p>
+        <p className="font-semibold text-foreground">Nessuna spesa ricorrente</p>
         <p className="mt-2 text-sm leading-6 text-zinc-600">Aggiungi affitti, abbonamenti e ricorrenze per generare movimenti futuri.</p>
         <Link href="/fixed-expenses/new" className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-white">
           <Plus aria-hidden className="h-4 w-4" />
-          Nuova spesa fissa
+          Nuova spesa ricorrente
         </Link>
       </div>
     );

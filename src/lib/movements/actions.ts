@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { toFieldErrors, type FormState } from "@/lib/auth/validation";
 import { movementFormSchema, movementRequestDecisionSchema, movementRequestFormSchema, parseContainerId } from "@/lib/movements/validation";
+import { safeMovementsReturnTo } from "@/lib/navigation/return-to";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createMovement, duplicateMovement, getMovementById, softDeleteMovement, updateMovement } from "@/services/movements/movement-service";
 import {
@@ -120,6 +121,7 @@ function messageFromError(error: unknown) {
 }
 
 export async function saveMovementAction(_prevState: FormState, formData: FormData): Promise<FormState> {
+  const returnTo = safeMovementsReturnTo(formData.get("returnTo"));
   const requestedForUserId = String(formData.get("requestedForUserId") ?? "self");
   const isRequest = requestedForUserId !== "self";
 
@@ -168,7 +170,7 @@ export async function saveMovementAction(_prevState: FormState, formData: FormDa
   }
 
   revalidatePath("/movements");
-  redirect("/movements");
+  redirect(returnTo);
 }
 
 export async function acceptMovementRequestAction(_prevState: FormState, formData: FormData): Promise<FormState> {
@@ -228,6 +230,7 @@ export async function cancelMovementRequestAction(formData: FormData) {
 
 export async function deleteMovementAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
+  const returnTo = safeMovementsReturnTo(formData.get("returnTo"));
   const { supabase, user } = await requireUser();
   const movement = await getMovementById(supabase, user.id, id);
   await softDeleteMovement(supabase, user.id, id);
@@ -235,13 +238,14 @@ export async function deleteMovementAction(formData: FormData) {
     await notifySharedMovement(supabase, movement, "deleted", user.id);
   }
   revalidatePath("/movements");
-  redirect("/movements");
+  redirect(returnTo);
 }
 
 export async function duplicateMovementAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
+  const returnTo = safeMovementsReturnTo(formData.get("returnTo"));
   const { supabase, user } = await requireUser();
   await duplicateMovement(supabase, user.id, id);
   revalidatePath("/movements");
-  redirect("/movements");
+  redirect(returnTo);
 }

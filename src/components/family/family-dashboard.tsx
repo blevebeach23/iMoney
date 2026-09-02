@@ -130,9 +130,9 @@ export function FamilyDashboard({
       </section>
 
       <section className="mt-6 space-y-3">
-        <h2 className="text-lg font-semibold text-foreground">Spese fisse in attesa</h2>
-        <FixedExpenseRequestGroup emptyText="Nessuna spesa fissa da approvare." requests={pendingFixedExpensesForMe} title="Da approvare" />
-        <FixedExpenseRequestGroup emptyText="Nessuna spesa fissa inviata." requests={sentFixedExpensesByMe} title="Inviate da me" />
+        <h2 className="text-lg font-semibold text-foreground">Spese ricorrenti in attesa</h2>
+        <FixedExpenseRequestGroup emptyText="Nessuna spesa ricorrente da approvare." requests={pendingFixedExpensesForMe} title="Da approvare" />
+        <FixedExpenseRequestGroup emptyText="Nessuna spesa ricorrente inviata." requests={sentFixedExpensesByMe} title="Inviate da me" />
       </section>
 
       <section className="mt-6 space-y-3">

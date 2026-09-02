@@ -9,7 +9,7 @@ function formatDate(value: string) {
   return new Intl.DateTimeFormat("it-IT").format(new Date(`${value}T00:00:00`));
 }
 
-export function MovementDetail({ movement }: Readonly<{ movement: MovementListItem }>) {
+export function MovementDetail({ movement, returnTo = "/movements" }: Readonly<{ movement: MovementListItem; returnTo?: string }>) {
   return (
     <div className="space-y-4">
       <article className="rounded-md border border-border bg-white p-4">
@@ -58,18 +58,19 @@ export function MovementDetail({ movement }: Readonly<{ movement: MovementListIt
         </dl>
       </article>
 
-      <Link href={`/movements/${movement.id}/edit`} className="flex min-h-11 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-white">
+      <Link href={`/movements/${movement.id}/edit?returnTo=${encodeURIComponent(returnTo)}`} className="flex min-h-11 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-white">
         <Pencil aria-hidden className="h-4 w-4" />
         Modifica
       </Link>
       <form action={duplicateMovementAction}>
         <input type="hidden" name="id" value={movement.id} />
+        <input type="hidden" name="returnTo" value={returnTo} />
         <Button type="submit" variant="secondary" className="w-full">
           <Copy aria-hidden className="h-4 w-4" />
           Duplica
         </Button>
       </form>
-      <DeleteMovementForm movementId={movement.id} />
+      <DeleteMovementForm movementId={movement.id} returnTo={returnTo} />
     </div>
   );
 }

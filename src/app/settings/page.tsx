@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 const items = [
   { href: "/movements", label: "Movimenti", icon: ListChecks },
-  { href: "/fixed-expenses", label: "Spese fisse", icon: CalendarClock },
+  { href: "/fixed-expenses", label: "Spese ricorrenti", icon: CalendarClock },
   { href: "/import", label: "Import CSV", icon: FileUp },
   { href: "/archive", label: "Archivio anni", icon: Archive },
   { href: "/budgets", label: "Budget", icon: WalletCards },

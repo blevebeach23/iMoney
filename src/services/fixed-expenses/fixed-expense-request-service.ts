@@ -172,7 +172,7 @@ function extractRpcId(data: unknown, key: string) {
   const value = first?.[key];
 
   if (!value) {
-    throw new Error("Risposta richiesta spesa fissa non valida");
+    throw new Error("Risposta richiesta spesa ricorrente non valida");
   }
 
   return String(value);

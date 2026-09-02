@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { toFieldErrors, type FormState } from "@/lib/auth/validation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { safeMovementsReturnTo } from "@/lib/navigation/return-to";
 import { parseTransferContainerId, transferFormSchema } from "@/lib/transfers/validation";
 import { createTransfer, softDeleteTransfer, updateTransfer } from "@/services/transfers/transfer-service";
 
@@ -52,6 +53,7 @@ function messageFromError(error: unknown) {
 }
 
 export async function saveTransferAction(_prevState: FormState, formData: FormData): Promise<FormState> {
+  const returnTo = safeMovementsReturnTo(formData.get("returnTo"));
   const parsed = transferFormSchema.safeParse(formDataToTransferObject(formData));
 
   if (!parsed.success) {
@@ -72,16 +74,17 @@ export async function saveTransferAction(_prevState: FormState, formData: FormDa
   revalidatePath("/movements");
   revalidatePath("/accounts");
   revalidatePath("/funds");
-  redirect("/movements");
+  redirect(returnTo);
 }
 
 export async function deleteTransferAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
+  const returnTo = safeMovementsReturnTo(formData.get("returnTo"));
   const { supabase, user } = await requireUser();
   await softDeleteTransfer(supabase, user.id, id);
   revalidatePath("/");
   revalidatePath("/movements");
   revalidatePath("/accounts");
   revalidatePath("/funds");
-  redirect("/movements");
+  redirect(returnTo);
 }

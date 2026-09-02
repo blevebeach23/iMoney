@@ -48,6 +48,7 @@ export function MovementForm({
   funds,
   households,
   movement,
+  returnTo = "/movements",
   requestRecipients = []
 }: Readonly<{
   accounts: Account[];
@@ -55,6 +56,7 @@ export function MovementForm({
   funds: Fund[];
   households: HouseholdOption[];
   movement?: MovementListItem;
+  returnTo?: string;
   requestRecipients?: MovementRequestRecipientOption[];
 }>) {
   const [state, action] = useFormState(saveMovementAction, initialState);
@@ -87,6 +89,7 @@ export function MovementForm({
     <form action={action} className="space-y-4">
       <FormMessage state={state} />
       {movement?.id && <input type="hidden" name="id" value={movement.id} />}
+      <input type="hidden" name="returnTo" value={returnTo} />
       <input type="hidden" name="householdId" value={movement?.householdId ?? defaultHousehold?.id ?? ""} />
       <input type="hidden" name="categoryOptions" value={JSON.stringify(categories)} />
 
@@ -173,6 +176,11 @@ export function MovementForm({
         <Save aria-hidden className="h-4 w-4" />
         {isRequestForOtherMember ? "Invia richiesta" : "Salva movimento"}
       </PendingButton>
+      {movement && (
+        <Link href={returnTo} className="flex min-h-11 items-center justify-center rounded-md border border-border bg-white px-4 text-sm font-semibold">
+          Annulla
+        </Link>
+      )}
     </form>
   );
 }

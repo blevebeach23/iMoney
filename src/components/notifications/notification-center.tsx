@@ -69,7 +69,7 @@ function notificationTypeLabel(type: string) {
     return "Movimenti";
   }
   if (type.startsWith("fixed_expense_")) {
-    return "Spese fisse";
+    return "Spese ricorrenti";
   }
   if (type.startsWith("budget_")) {
     return "Budget";

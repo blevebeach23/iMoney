@@ -34,8 +34,8 @@ export default async function EditFixedExpensePage({ params }: Readonly<{ params
   return (
     <main className="mx-auto min-h-dvh max-w-md px-4 pb-24 pt-6">
       <header className="mb-6">
-        <p className="text-sm font-semibold text-primary">Spese fisse</p>
-        <h1 className="mt-2 text-3xl font-bold tracking-normal text-foreground">Modifica spesa fissa</h1>
+        <p className="text-sm font-semibold text-primary">Spese ricorrenti</p>
+        <h1 className="mt-2 text-3xl font-bold tracking-normal text-foreground">Modifica spesa ricorrente</h1>
       </header>
       <FixedExpenseForm accounts={accounts} categoryTree={categoryTree} fixedExpense={fixedExpense} funds={funds} households={households} />
     </main>

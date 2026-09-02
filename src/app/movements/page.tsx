@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Plus } from "lucide-react";
 import { MovementFiltersForm, MovementTimeline } from "@/components/movements/movement-list";
+import { MovementListStateRestorer } from "@/components/movements/movement-list-state";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAccounts } from "@/services/accounts/account-service";
 import { getCategoryTree } from "@/services/categories/category-service";
@@ -47,9 +48,18 @@ export default async function MovementsPage({ searchParams }: Readonly<{ searchP
     showTransfers ? getTransfers(supabase, user.id, { period: filters.period, containerId: filters.containerId, shared: filters.shared }) : Promise.resolve([])
   ]);
   const timeline = buildMovementTimeline(movements, transfers);
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(searchParams)) {
+    const first = firstParam(value);
+    if (first) {
+      query.set(key, first);
+    }
+  }
+  const returnTo = query.size > 0 ? `/movements?${query.toString()}` : "/movements";
 
   return (
     <main className="mx-auto min-h-dvh max-w-md px-4 pb-24 pt-6">
+      <MovementListStateRestorer />
       <header className="mb-6 flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-primary">Movimenti</p>
@@ -62,7 +72,7 @@ export default async function MovementsPage({ searchParams }: Readonly<{ searchP
       </header>
       <div className="space-y-4">
         <MovementFiltersForm accounts={accounts} categoryTree={categoryTree} filters={filters} funds={funds} />
-        <MovementTimeline items={timeline} />
+        <MovementTimeline items={timeline} returnTo={returnTo} />
       </div>
     </main>
   );

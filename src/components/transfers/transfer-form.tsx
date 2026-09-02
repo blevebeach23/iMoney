@@ -23,8 +23,9 @@ export function TransferForm({
   accounts,
   funds,
   households,
+  returnTo = "/movements",
   transfer
-}: Readonly<{ accounts: Account[]; funds: Fund[]; households: ActiveHouseholdOption[]; transfer?: TransferListItem }>) {
+}: Readonly<{ accounts: Account[]; funds: Fund[]; households: ActiveHouseholdOption[]; returnTo?: string; transfer?: TransferListItem }>) {
   const [state, action] = useFormState(saveTransferAction, initialState);
   const today = new Date().toISOString().slice(0, 10);
   const containers = containerOptions(accounts, funds);
@@ -57,6 +58,7 @@ export function TransferForm({
     <form action={action} className="space-y-4">
       <FormMessage state={state} />
       {transfer?.id && <input type="hidden" name="id" value={transfer.id} />}
+      <input type="hidden" name="returnTo" value={returnTo} />
       <TextField label="Data" name="occurredOn" type="date" defaultValue={transfer?.occurredOn ?? today} errors={state.fieldErrors} />
       <SelectField label="Origine" name="fromContainerId" defaultValue={fromValue} options={containers} errors={state.fieldErrors} />
       <SelectField label="Destinazione" name="toContainerId" defaultValue={toValue} options={containers} errors={state.fieldErrors} />
@@ -73,6 +75,11 @@ export function TransferForm({
         <Save aria-hidden className="h-4 w-4" />
         Salva trasferimento
       </PendingButton>
+      {transfer && (
+        <Link href={returnTo} className="flex min-h-11 items-center justify-center rounded-md border border-border bg-white px-4 text-sm font-semibold">
+          Annulla
+        </Link>
+      )}
     </form>
   );
 }

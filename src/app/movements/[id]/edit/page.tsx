@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { MovementForm } from "@/components/movements/movement-form";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { safeMovementsReturnTo } from "@/lib/navigation/return-to";
 import { getAccounts } from "@/services/accounts/account-service";
 import { getCategoryTree } from "@/services/categories/category-service";
 import { getFunds } from "@/services/funds/fund-service";
@@ -9,7 +10,7 @@ import { getMovementById } from "@/services/movements/movement-service";
 
 export const dynamic = "force-dynamic";
 
-export default async function EditMovementPage({ params }: Readonly<{ params: { id: string } }>) {
+export default async function EditMovementPage({ params, searchParams }: Readonly<{ params: { id: string }; searchParams?: Record<string, string | string[] | undefined> }>) {
   const supabase = createServerSupabaseClient();
   const {
     data: { user }
@@ -37,7 +38,7 @@ export default async function EditMovementPage({ params }: Readonly<{ params: { 
         <p className="text-sm font-semibold text-primary">Movimenti</p>
         <h1 className="mt-2 text-3xl font-bold tracking-normal text-foreground">Modifica movimento</h1>
       </header>
-      <MovementForm accounts={accounts} categoryTree={categoryTree} funds={funds} households={households} movement={movement} />
+      <MovementForm accounts={accounts} categoryTree={categoryTree} funds={funds} households={households} movement={movement} returnTo={safeMovementsReturnTo(searchParams?.returnTo)} />
     </main>
   );
 }

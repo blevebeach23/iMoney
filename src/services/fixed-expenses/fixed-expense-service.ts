@@ -89,7 +89,7 @@ export async function generateFixedExpenseMovements(
   const rule = await getFixedExpenseById(supabase, userId, fixedExpenseId);
 
   if (!rule) {
-    throw new Error("Spesa fissa non trovata");
+    throw new Error("Spesa ricorrente non trovata");
   }
 
   const occurrences = buildFixedExpenseOccurrences(rule, fromMonthStart, toMonthStart);

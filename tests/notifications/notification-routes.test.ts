@@ -140,6 +140,7 @@ describe("notification route mapping", () => {
     expect(sanitizeNotificationDestination("/family/movement-requests/movement-1")).toBe("/notifications");
     expect(sanitizeNotificationDestination("/movements/10000000-0000-4000-8000-000000000001")).toBe("/movements/10000000-0000-4000-8000-000000000001");
     expect(sanitizeNotificationDestination("/family/movements/10000000-0000-4000-8000-000000000001")).toBe("/family/movements/10000000-0000-4000-8000-000000000001");
+    expect(sanitizeNotificationDestination("/family/transfers/10000000-0000-4000-8000-000000000001")).toBe("/family/transfers/10000000-0000-4000-8000-000000000001");
     expect(sanitizeNotificationDestination("/family/movement-requests/10000000-0000-4000-8000-000000000001")).toBe("/family/movement-requests/10000000-0000-4000-8000-000000000001");
     expect(sanitizeNotificationDestination("/family/fixed-expense-requests/10000000-0000-4000-8000-000000000001")).toBe(
       "/family/fixed-expense-requests/10000000-0000-4000-8000-000000000001"

@@ -76,7 +76,7 @@ export function FixedExpenseForm({
     return (
       <div className="space-y-3 rounded-md border border-border bg-white p-4">
         <p className="font-semibold">Servono dati di base</p>
-        <p className="text-sm leading-6 text-zinc-600">Crea almeno una categoria e, per le spese fisse personali, un conto o fondo.</p>
+        <p className="text-sm leading-6 text-zinc-600">Crea almeno una categoria e, per le spese ricorrenti personali, un conto o fondo.</p>
         <div className="grid grid-cols-2 gap-3">
           <Link href="/accounts" className="inline-flex min-h-11 items-center justify-center rounded-md border border-border px-4 text-sm font-semibold">
             Conti
@@ -146,7 +146,7 @@ export function FixedExpenseForm({
 
       <PendingButton>
         <Save aria-hidden className="h-4 w-4" />
-        {isRequestForOtherMember ? "Invia richiesta" : "Salva spesa fissa"}
+        {isRequestForOtherMember ? "Invia richiesta" : "Salva spesa ricorrente"}
       </PendingButton>
     </form>
   );

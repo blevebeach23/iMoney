@@ -96,7 +96,7 @@ export function MovementFiltersForm({
   );
 }
 
-export function MovementTimeline({ items }: Readonly<{ items: TimelineItem[] }>) {
+export function MovementTimeline({ items, returnTo = "/movements" }: Readonly<{ items: TimelineItem[]; returnTo?: string }>) {
   if (items.length === 0) {
     return (
       <div className="rounded-md border border-dashed border-border bg-white p-5">
@@ -112,15 +112,15 @@ export function MovementTimeline({ items }: Readonly<{ items: TimelineItem[] }>)
 
   return (
     <div className="space-y-3">
-      {items.map((item) => (item.kind === "movement" ? <MovementTimelineCard key={`movement:${item.id}`} movement={item.movement} /> : <TransferTimelineCard key={`transfer:${item.id}`} item={item} />))}
+      {items.map((item) => (item.kind === "movement" ? <MovementTimelineCard key={`movement:${item.id}`} movement={item.movement} returnTo={returnTo} /> : <TransferTimelineCard key={`transfer:${item.id}`} item={item} returnTo={returnTo} />))}
     </div>
   );
 }
 
-function MovementTimelineCard({ movement }: Readonly<{ movement: MovementListItem }>) {
+function MovementTimelineCard({ movement, returnTo }: Readonly<{ movement: MovementListItem; returnTo: string }>) {
   return (
     <article className="rounded-md border border-border bg-white p-4">
-      <Link href={`/movements/${movement.id}`} className="block">
+      <Link href={`/movements/${movement.id}?returnTo=${encodeURIComponent(returnTo)}`} className="block">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-zinc-500">{formatDate(movement.occurredOn)}</p>
@@ -149,6 +149,7 @@ function MovementTimelineCard({ movement }: Readonly<{ movement: MovementListIte
       </Link>
       <form action={duplicateMovementAction} className="mt-3">
         <input type="hidden" name="id" value={movement.id} />
+        <input type="hidden" name="returnTo" value={returnTo} />
         <Button type="submit" variant="secondary" className="w-full">
           <Copy aria-hidden className="h-4 w-4" />
           Duplica
@@ -158,12 +159,12 @@ function MovementTimelineCard({ movement }: Readonly<{ movement: MovementListIte
   );
 }
 
-function TransferTimelineCard({ item }: Readonly<{ item: Extract<TimelineItem, { kind: "transfer" }> }>) {
+function TransferTimelineCard({ item, returnTo }: Readonly<{ item: Extract<TimelineItem, { kind: "transfer" }>; returnTo: string }>) {
   const transfer = item.transfer;
 
   return (
     <article className="rounded-md border border-border bg-white p-4">
-      <Link href={`/transfers/${transfer.id}`} className="block">
+      <Link href={`/transfers/${transfer.id}?returnTo=${encodeURIComponent(returnTo)}`} className="block">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-zinc-500">{formatDate(transfer.occurredOn)}</p>

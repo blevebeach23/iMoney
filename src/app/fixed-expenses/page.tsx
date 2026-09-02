@@ -28,7 +28,7 @@ export default async function FixedExpensesPage() {
     <main className="mx-auto min-h-dvh max-w-md px-4 pb-24 pt-6">
       <header className="mb-6 flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-primary">Spese fisse</p>
+          <p className="text-sm font-semibold text-primary">Spese ricorrenti</p>
           <h1 className="mt-2 text-3xl font-bold tracking-normal text-foreground">Ricorrenze</h1>
         </div>
         <Link href="/fixed-expenses/new" className="inline-flex min-h-11 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-white">

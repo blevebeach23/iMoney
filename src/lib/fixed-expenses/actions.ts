@@ -113,7 +113,7 @@ export async function saveFixedExpenseAction(_prevState: FormState, formData: Fo
       const { supabase, user } = await requireUser();
 
       if (parsedRequest.data.recipientUserId === user.id) {
-        return { ok: false, fieldErrors: { requestedForUserId: ["Per te stesso usa la spesa fissa normale"] } };
+        return { ok: false, fieldErrors: { requestedForUserId: ["Per te stesso usa la spesa ricorrente normale"] } };
       }
 
       requestId = await createFixedExpenseRequest(supabase, user.id, parsedRequest.data);
@@ -148,7 +148,7 @@ export async function saveFixedExpenseAction(_prevState: FormState, formData: Fo
   revalidatePath("/fixed-expenses");
   revalidatePath("/movements");
   revalidatePath("/");
-  return { ok: true, message: "Spesa fissa salvata" };
+  return { ok: true, message: "Spesa ricorrente salvata" };
 }
 
 export async function acceptFixedExpenseRequestAction(_prevState: FormState, formData: FormData): Promise<FormState> {

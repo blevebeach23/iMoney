@@ -7,7 +7,7 @@ function formatDate(value: string) {
   return new Intl.DateTimeFormat("it-IT").format(new Date(`${value}T00:00:00`));
 }
 
-export function TransferDetail({ readOnly = false, transfer }: Readonly<{ readOnly?: boolean; transfer: TransferListItem }>) {
+export function TransferDetail({ readOnly = false, returnTo = "/movements", transfer }: Readonly<{ readOnly?: boolean; returnTo?: string; transfer: TransferListItem }>) {
   return (
     <div className="space-y-4">
       <article className="rounded-md border border-border bg-white p-4">
@@ -43,11 +43,11 @@ export function TransferDetail({ readOnly = false, transfer }: Readonly<{ readOn
       </article>
       {!readOnly && (
         <>
-          <Link href={`/transfers/${transfer.id}/edit`} className="flex min-h-11 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-white">
+          <Link href={`/transfers/${transfer.id}/edit?returnTo=${encodeURIComponent(returnTo)}`} className="flex min-h-11 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-white">
             <Pencil aria-hidden className="h-4 w-4" />
             Modifica
           </Link>
-          <DeleteTransferForm transferId={transfer.id} />
+          <DeleteTransferForm transferId={transfer.id} returnTo={returnTo} />
         </>
       )}
     </div>

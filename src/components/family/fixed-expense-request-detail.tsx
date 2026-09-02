@@ -56,7 +56,7 @@ export function FixedExpenseRequestDetail({
       <article className="rounded-md border border-border bg-white p-4 shadow-panel">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold text-primary">Spesa fissa per conto di</p>
+            <p className="text-sm font-semibold text-primary">Spesa ricorrente per conto di</p>
             <h1 className="mt-2 text-2xl font-bold tracking-normal">{request.description}</h1>
           </div>
           <span className="rounded-md bg-zinc-100 px-2 py-1 text-xs font-semibold">{fixedExpenseRequestStatusLabel(request.status)}</span>
@@ -96,7 +96,7 @@ export function FixedExpenseRequestDetail({
       )}
       {isRecipient && request.acceptedFixedExpenseId && (
         <Link href={`/fixed-expenses/${request.acceptedFixedExpenseId}/edit`} className="flex min-h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-white">
-          Apri spesa fissa creata
+          Apri spesa ricorrente creata
         </Link>
       )}
     </div>
