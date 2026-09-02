@@ -11,6 +11,7 @@ import {
   acceptFixedExpenseRequest,
   cancelFixedExpenseRequest,
   createFixedExpenseRequest,
+  getFixedExpenseRequestRecipientOptions,
   rejectFixedExpenseRequest
 } from "@/services/fixed-expenses/fixed-expense-request-service";
 import type { FixedExpenseRequest } from "@/types/domain";
@@ -66,6 +67,53 @@ function request(partial: Partial<FixedExpenseRequest> = {}): FixedExpenseReques
 describe("fixed expense request service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("loads household recipients through the display RPC instead of joining profiles directly", async () => {
+    const rpc = vi.fn((name: string) => {
+      if (name === "get_household_members_for_display") {
+        return Promise.resolve({
+          data: [
+            {
+              full_name: "Vito Bleve",
+              household_id: "household-1",
+              status: "ACTIVE",
+              user_id: "user-1",
+              username: "vito"
+            },
+            {
+              full_name: "Anna Rossi",
+              household_id: "household-1",
+              status: "ACTIVE",
+              user_id: "user-2",
+              username: "anna"
+            }
+          ],
+          error: null
+        });
+      }
+
+      return Promise.resolve({ data: null, error: null });
+    });
+    const eqStatus = vi.fn().mockResolvedValue({ data: [{ household_id: "household-1" }], error: null });
+    const eqUser = vi.fn().mockReturnValue({ eq: eqStatus });
+    const select = vi.fn().mockReturnValue({ eq: eqUser });
+    const from = vi.fn().mockReturnValue({ select });
+
+    const recipients = await getFixedExpenseRequestRecipientOptions({ from, rpc } as unknown as SupabaseClient, "user-1");
+
+    expect(recipients).toEqual([
+      {
+        fullName: "Anna Rossi",
+        householdId: "household-1",
+        userId: "user-2",
+        username: "anna"
+      }
+    ]);
+    expect(from).toHaveBeenCalledWith("household_members");
+    expect(select).toHaveBeenCalledWith("household_id");
+    expect(select).not.toHaveBeenCalledWith(expect.stringContaining("profiles"));
+    expect(rpc).toHaveBeenCalledWith("get_household_members_for_display", { target_household_id: "household-1" });
   });
 
   it("creates a pending request and notifies only the recipient", async () => {

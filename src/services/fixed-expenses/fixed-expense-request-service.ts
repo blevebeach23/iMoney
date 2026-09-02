@@ -35,26 +35,29 @@ export async function getFixedExpenseRequestRecipientOptions(supabase: SupabaseC
     return [];
   }
 
-  const { data, error } = await supabase
-    .from("household_members")
-    .select("household_id, user_id, profiles(full_name, username)")
-    .in("household_id", householdIds)
-    .eq("status", "ACTIVE")
-    .neq("user_id", userId);
+  const membersByHousehold = await Promise.all(
+    householdIds.map(async (householdId) => {
+      const { data, error } = await supabase.rpc("get_household_members_for_display", {
+        target_household_id: householdId
+      });
 
-  if (error) {
-    throw error;
-  }
+      if (error) {
+        throw error;
+      }
 
-  return (data ?? []).map((row: Row) => {
-    const profile = asRecord(row.profiles);
-    return {
+      return (data ?? []) as Row[];
+    })
+  );
+
+  return membersByHousehold
+    .flat()
+    .filter((row) => String(row.status) === "ACTIVE" && String(row.user_id) !== userId)
+    .map((row) => ({
       householdId: String(row.household_id),
       userId: String(row.user_id),
-      fullName: profile?.full_name ? String(profile.full_name) : "Membro",
-      username: profile?.username ? String(profile.username) : ""
-    };
-  });
+      fullName: row.full_name ? String(row.full_name) : "Membro",
+      username: row.username ? String(row.username) : ""
+    }));
 }
 
 export async function createFixedExpenseRequest(supabase: SupabaseClient, userId: string, input: FixedExpenseRequestFormInput): Promise<string> {
