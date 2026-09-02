@@ -1,9 +1,13 @@
+"use client";
+
 import Link from "next/link";
 import { ArrowRightLeft, Copy, Plus, Share2 } from "lucide-react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { duplicateMovementAction } from "@/lib/movements/actions";
+import { bulkUpdateTimelineAction, duplicateMovementAction } from "@/lib/movements/actions";
 import type { Account, Fund } from "@/types/domain";
 import type { CategoryTreeItem } from "@/services/categories/category-service";
+import type { ActiveHouseholdOption } from "@/services/households/household-service";
 import type { MovementFilters, MovementListItem } from "@/services/movements/movement-service";
 import type { TimelineItem } from "@/services/timeline/timeline-service";
 
@@ -28,6 +32,15 @@ function containerOptions(accounts: Account[], funds: Fund[]) {
     ...accounts.map((account) => ({ value: `account:${account.id}`, label: `Conto / ${account.name}` })),
     ...funds.map((fund) => ({ value: `fund:${fund.id}`, label: `Fondo / ${fund.name}` }))
   ];
+}
+
+function categoryOptions(categoryTree: CategoryTreeItem[]) {
+  return categoryTree.flatMap((macro) =>
+    macro.categories.map((category) => ({
+      value: category.id,
+      label: `${macro.name} / ${category.name}`
+    }))
+  );
 }
 
 export function MovementFiltersForm({
@@ -96,7 +109,18 @@ export function MovementFiltersForm({
   );
 }
 
-export function MovementTimeline({ items, returnTo = "/movements" }: Readonly<{ items: TimelineItem[]; returnTo?: string }>) {
+export function MovementTimeline({
+  accounts,
+  categoryTree,
+  funds,
+  households,
+  items,
+  returnTo = "/movements"
+}: Readonly<{ accounts: Account[]; categoryTree: CategoryTreeItem[]; funds: Fund[]; households: ActiveHouseholdOption[]; items: TimelineItem[]; returnTo?: string }>) {
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const selectedItems = useMemo(() => items.filter((item) => selectedIds.includes(`${item.kind}:${item.id}`)), [items, selectedIds]);
+
   if (items.length === 0) {
     return (
       <div className="rounded-md border border-dashed border-border bg-white p-5">
@@ -112,14 +136,62 @@ export function MovementTimeline({ items, returnTo = "/movements" }: Readonly<{ 
 
   return (
     <div className="space-y-3">
-      {items.map((item) => (item.kind === "movement" ? <MovementTimelineCard key={`movement:${item.id}`} movement={item.movement} returnTo={returnTo} /> : <TransferTimelineCard key={`transfer:${item.id}`} item={item} returnTo={returnTo} />))}
+      <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-white p-3">
+        <span className="text-sm font-semibold">{selectionMode ? `${selectedIds.length} selezionati` : "Modifica multipla"}</span>
+        <div className="flex gap-2">
+          {selectionMode && (
+            <Button type="button" variant="secondary" onClick={() => setSelectedIds(items.map((item) => `${item.kind}:${item.id}`))}>
+              Seleziona tutti
+            </Button>
+          )}
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              setSelectionMode((value) => !value);
+              setSelectedIds([]);
+            }}
+          >
+            {selectionMode ? "Annulla" : "Seleziona"}
+          </Button>
+        </div>
+      </div>
+      {selectionMode && (
+        <BulkActionBar
+          accounts={accounts}
+          categoryTree={categoryTree}
+          funds={funds}
+          households={households}
+          returnTo={returnTo}
+          selectedItems={selectedItems}
+        />
+      )}
+      {items.map((item) =>
+        item.kind === "movement" ? (
+          <MovementTimelineCard key={`movement:${item.id}`} movement={item.movement} returnTo={returnTo} selectable={selectionMode} selected={selectedIds.includes(`movement:${item.id}`)} onSelectedChange={(checked) => setSelectedIds((ids) => toggleId(ids, `movement:${item.id}`, checked))} />
+        ) : (
+          <TransferTimelineCard key={`transfer:${item.id}`} item={item} returnTo={returnTo} selectable={selectionMode} selected={selectedIds.includes(`transfer:${item.id}`)} onSelectedChange={(checked) => setSelectedIds((ids) => toggleId(ids, `transfer:${item.id}`, checked))} />
+        )
+      )}
     </div>
   );
 }
 
-function MovementTimelineCard({ movement, returnTo }: Readonly<{ movement: MovementListItem; returnTo: string }>) {
+function MovementTimelineCard({
+  movement,
+  onSelectedChange,
+  returnTo,
+  selectable = false,
+  selected = false
+}: Readonly<{ movement: MovementListItem; onSelectedChange?: (checked: boolean) => void; returnTo: string; selectable?: boolean; selected?: boolean }>) {
   return (
     <article className="rounded-md border border-border bg-white p-4">
+      {selectable && (
+        <label className="mb-3 flex items-center gap-2 text-sm font-semibold">
+          <input type="checkbox" checked={selected} onChange={(event) => onSelectedChange?.(event.target.checked)} className="h-5 w-5" />
+          Seleziona
+        </label>
+      )}
       <Link href={`/movements/${movement.id}?returnTo=${encodeURIComponent(returnTo)}`} className="block">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -159,11 +231,23 @@ function MovementTimelineCard({ movement, returnTo }: Readonly<{ movement: Movem
   );
 }
 
-function TransferTimelineCard({ item, returnTo }: Readonly<{ item: Extract<TimelineItem, { kind: "transfer" }>; returnTo: string }>) {
+function TransferTimelineCard({
+  item,
+  onSelectedChange,
+  returnTo,
+  selectable = false,
+  selected = false
+}: Readonly<{ item: Extract<TimelineItem, { kind: "transfer" }>; onSelectedChange?: (checked: boolean) => void; returnTo: string; selectable?: boolean; selected?: boolean }>) {
   const transfer = item.transfer;
 
   return (
     <article className="rounded-md border border-border bg-white p-4">
+      {selectable && (
+        <label className="mb-3 flex items-center gap-2 text-sm font-semibold">
+          <input type="checkbox" checked={selected} onChange={(event) => onSelectedChange?.(event.target.checked)} className="h-5 w-5" />
+          Seleziona
+        </label>
+      )}
       <Link href={`/transfers/${transfer.id}?returnTo=${encodeURIComponent(returnTo)}`} className="block">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -191,4 +275,81 @@ function TransferTimelineCard({ item, returnTo }: Readonly<{ item: Extract<Timel
       </Link>
     </article>
   );
+}
+
+function BulkActionBar({
+  accounts,
+  categoryTree,
+  funds,
+  households,
+  returnTo,
+  selectedItems
+}: Readonly<{ accounts: Account[]; categoryTree: CategoryTreeItem[]; funds: Fund[]; households: ActiveHouseholdOption[]; returnTo: string; selectedItems: TimelineItem[] }>) {
+  const [bulkAction, setBulkAction] = useState("date");
+  const hasMovements = selectedItems.some((item) => item.kind === "movement");
+  const hasTransfers = selectedItems.some((item) => item.kind === "transfer");
+  const movementOnly = hasMovements && !hasTransfers;
+  const actions = [
+    { value: "date", label: "Cambia data" },
+    ...(movementOnly
+      ? [
+          { value: "category", label: "Cambia categoria" },
+          { value: "container", label: "Cambia conto/fondo" }
+        ]
+      : []),
+    ...(households[0]
+      ? [
+          { value: "share", label: "Condividi Family" },
+          { value: "unshare", label: "Rimuovi condivisione Family" }
+        ]
+      : [{ value: "unshare", label: "Rimuovi condivisione Family" }])
+  ];
+  const selectedMovements = selectedItems.filter((item) => item.kind === "movement").map((item) => item.id);
+  const selectedTransfers = selectedItems.filter((item) => item.kind === "transfer").map((item) => item.id);
+
+  return (
+    <form action={bulkUpdateTimelineAction} className="space-y-3 rounded-md border border-border bg-white p-4">
+      <input type="hidden" name="returnTo" value={returnTo} />
+      <input type="hidden" name="movementIds" value={selectedMovements.join(",")} />
+      <input type="hidden" name="transferIds" value={selectedTransfers.join(",")} />
+      <input type="hidden" name="householdId" value={households[0]?.id ?? ""} />
+      <select name="bulkAction" value={bulkAction} onChange={(event) => setBulkAction(event.target.value)} className="h-11 w-full rounded-md border border-border px-3">
+        {actions.map((action) => (
+          <option key={action.value} value={action.value}>
+            {action.label}
+          </option>
+        ))}
+      </select>
+      {bulkAction === "date" && <input name="occurredOn" type="date" className="h-11 w-full rounded-md border border-border px-3" />}
+      {bulkAction === "category" && (
+        <select name="categoryId" className="h-11 w-full rounded-md border border-border px-3">
+          {categoryOptions(categoryTree).map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      )}
+      {bulkAction === "container" && (
+        <select name="containerId" className="h-11 w-full rounded-md border border-border px-3">
+          {containerOptions(accounts, funds).map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      )}
+      <Button type="submit" disabled={selectedItems.length === 0} className="w-full">
+        Applica a {selectedItems.length} selezionati
+      </Button>
+    </form>
+  );
+}
+
+function toggleId(ids: string[], id: string, checked: boolean) {
+  if (checked) {
+    return ids.includes(id) ? ids : [...ids, id];
+  }
+
+  return ids.filter((item) => item !== id);
 }

@@ -170,6 +170,26 @@ export interface Transfer {
   creditCardAccountId?: string | null;
   creditCardCycleStartOn?: string | null;
   creditCardCycleEndOn?: string | null;
+  recurringTransferId?: string | null;
+}
+
+export interface RecurringTransfer {
+  id: string;
+  ownerUserId: string;
+  householdId: string | null;
+  fromAccountId: string | null;
+  toAccountId: string | null;
+  fromFundId: string | null;
+  toFundId: string | null;
+  amount: MoneyAmount;
+  description: string;
+  frequency: FixedExpenseFrequency;
+  startsOn: string;
+  endsOn: string | null;
+  dayOfMonth: number;
+  isActive: boolean;
+  isSharedWithHousehold: boolean;
+  deletedAt: string | null;
 }
 
 export type BudgetOwnerType = "USER" | "HOUSEHOLD";

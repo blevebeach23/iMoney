@@ -7,6 +7,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAccounts } from "@/services/accounts/account-service";
 import { getCategoryTree } from "@/services/categories/category-service";
 import { getFunds } from "@/services/funds/fund-service";
+import { getActiveHouseholdOptions } from "@/services/households/household-service";
 import { getMovements, type MovementFilters } from "@/services/movements/movement-service";
 import { buildMovementTimeline, transfersCanBeShownWithMovementFilters } from "@/services/timeline/timeline-service";
 import { getTransfers } from "@/services/transfers/transfer-service";
@@ -40,10 +41,11 @@ export default async function MovementsPage({ searchParams }: Readonly<{ searchP
   const showTransfers = transfersCanBeShownWithMovementFilters(filters);
   const showMovements = filters.type !== "transfer";
   const movementFilters: MovementFilters = filters.type === "transfer" ? { ...filters, type: "all" } : filters;
-  const [accounts, funds, categoryTree, movements, transfers] = await Promise.all([
+  const [accounts, funds, categoryTree, households, movements, transfers] = await Promise.all([
     getAccounts(supabase, user.id),
     getFunds(supabase, user.id),
     getCategoryTree(supabase, user.id),
+    getActiveHouseholdOptions(supabase, user.id),
     showMovements ? getMovements(supabase, user.id, movementFilters) : Promise.resolve([]),
     showTransfers ? getTransfers(supabase, user.id, { period: filters.period, containerId: filters.containerId, shared: filters.shared }) : Promise.resolve([])
   ]);
@@ -72,7 +74,7 @@ export default async function MovementsPage({ searchParams }: Readonly<{ searchP
       </header>
       <div className="space-y-4">
         <MovementFiltersForm accounts={accounts} categoryTree={categoryTree} filters={filters} funds={funds} />
-        <MovementTimeline items={timeline} returnTo={returnTo} />
+        <MovementTimeline accounts={accounts} categoryTree={categoryTree} funds={funds} households={households} items={timeline} returnTo={returnTo} />
       </div>
     </main>
   );

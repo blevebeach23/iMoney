@@ -214,7 +214,8 @@ function mapTransferRow(row: TransferRow): Transfer {
     deletedAt: row.deleted_at ? String(row.deleted_at) : null,
     creditCardAccountId: row.credit_card_account_id ? String(row.credit_card_account_id) : null,
     creditCardCycleStartOn: row.credit_card_cycle_start_on ? String(row.credit_card_cycle_start_on) : null,
-    creditCardCycleEndOn: row.credit_card_cycle_end_on ? String(row.credit_card_cycle_end_on) : null
+    creditCardCycleEndOn: row.credit_card_cycle_end_on ? String(row.credit_card_cycle_end_on) : null,
+    recurringTransferId: row.recurring_transfer_id ? String(row.recurring_transfer_id) : null
   };
 }
 

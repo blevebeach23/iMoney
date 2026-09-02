@@ -249,3 +249,83 @@ export async function duplicateMovementAction(formData: FormData) {
   revalidatePath("/movements");
   redirect(returnTo);
 }
+
+export async function bulkUpdateTimelineAction(formData: FormData) {
+  const returnTo = safeMovementsReturnTo(formData.get("returnTo"));
+  const movementIds = parseIdList(String(formData.get("movementIds") ?? ""));
+  const transferIds = parseIdList(String(formData.get("transferIds") ?? ""));
+  const action = String(formData.get("bulkAction") ?? "");
+
+  if (movementIds.length === 0 && transferIds.length === 0) {
+    redirect(returnTo);
+  }
+
+  const { supabase, user } = await requireUser();
+  const movementUpdate: Record<string, string | boolean | null> = {};
+  const transferUpdate: Record<string, string | boolean | null> = {};
+
+  if (action === "date") {
+    const occurredOn = String(formData.get("occurredOn") ?? "");
+    if (/^\d{4}-\d{2}-\d{2}$/.test(occurredOn)) {
+      movementUpdate.occurred_on = occurredOn;
+      transferUpdate.occurred_on = occurredOn;
+    }
+  }
+
+  if (action === "category" && movementIds.length > 0 && transferIds.length === 0) {
+    const categoryId = String(formData.get("categoryId") ?? "");
+    if (categoryId) {
+      movementUpdate.category_id = categoryId;
+    }
+  }
+
+  if (action === "container" && movementIds.length > 0 && transferIds.length === 0) {
+    const container = parseContainerId(String(formData.get("containerId") ?? ""));
+    movementUpdate.account_id = container.accountId;
+    movementUpdate.fund_id = container.fundId;
+  }
+
+  if (action === "share") {
+    const householdId = String(formData.get("householdId") ?? "");
+    if (householdId) {
+      movementUpdate.shared_with_family = true;
+      movementUpdate.household_id = householdId;
+      transferUpdate.shared_with_family = true;
+      transferUpdate.household_id = householdId;
+    }
+  }
+
+  if (action === "unshare") {
+    movementUpdate.shared_with_family = false;
+    movementUpdate.household_id = null;
+    transferUpdate.shared_with_family = false;
+    transferUpdate.household_id = null;
+  }
+
+  if (Object.keys(movementUpdate).length > 0 && movementIds.length > 0) {
+    const { error } = await supabase.from("movements").update({ ...movementUpdate, updated_by: user.id }).in("id", movementIds).eq("owner_user_id", user.id).is("deleted_at", null);
+    if (error) {
+      throw error;
+    }
+  }
+
+  if (Object.keys(transferUpdate).length > 0 && transferIds.length > 0) {
+    const { error } = await supabase.from("transfers").update(transferUpdate).in("id", transferIds).eq("owner_user_id", user.id).is("deleted_at", null);
+    if (error) {
+      throw error;
+    }
+  }
+
+  revalidatePath("/movements");
+  revalidatePath("/family");
+  revalidatePath("/");
+  redirect(returnTo);
+}
+
+function parseIdList(value: string): string[] {
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => uuid.test(item));
+}

@@ -36,6 +36,13 @@ export default async function AddPage() {
           </span>
           <ArrowRightLeft aria-hidden className="h-5 w-5 text-primary" />
         </Link>
+        <Link href="/recurring-transfers/new" className="flex min-h-20 items-center justify-between rounded-md border border-border bg-white px-4 shadow-panel">
+          <span>
+            <span className="block font-semibold">Trasferimento ricorrente</span>
+            <span className="mt-1 block text-sm text-zinc-600">Giroconto o accantonamento periodico</span>
+          </span>
+          <ArrowRightLeft aria-hidden className="h-5 w-5 text-primary" />
+        </Link>
       </div>
     </main>
   );

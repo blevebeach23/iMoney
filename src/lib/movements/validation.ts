@@ -12,7 +12,7 @@ const containerSchema = z
 
 export const movementFilterSchema = z.object({
   period: z.string().optional(),
-  type: z.enum(["all", "income", "expense", "reimbursement"]).default("all"),
+  type: z.enum(["all", "income", "expense", "reimbursement", "transfer"]).default("all"),
   macroCategoryId: z.string().uuid().optional(),
   categoryId: z.string().uuid().optional(),
   containerId: z.string().optional(),
