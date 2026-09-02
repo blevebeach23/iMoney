@@ -16,12 +16,12 @@ describe("future expense reminder configuration", () => {
     expect(migration).toContain("where deleted_at is null and type = 'expense'");
   });
 
-  it("configures the minimum daily UTC cron invocations needed for Europe/Rome DST", () => {
+  it("configures one daily UTC cron invocation allowed by Vercel Hobby", () => {
     const vercel = readFileSync(join(root, "vercel.json"), "utf8");
     const envExample = readFileSync(join(root, ".env.example"), "utf8");
 
     expect(vercel).toContain("\"path\": \"/api/cron/future-expense-reminders\"");
-    expect(vercel).toContain("\"schedule\": \"0 10,11 * * *\"");
+    expect(vercel).toContain("\"schedule\": \"0 10 * * *\"");
     expect(envExample).toContain("CRON_SECRET=");
   });
 
