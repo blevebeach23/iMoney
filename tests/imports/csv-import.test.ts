@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseCsv, csvRowsToObjects } from "@/lib/imports/csv";
-import { buildImportPreview } from "@/lib/imports/mapping";
+import { buildImportPreview, inferInitialColumns } from "@/lib/imports/mapping";
 import { inferMovementType, parseCsvAmount, parseCsvDate } from "@/lib/imports/normalization";
 import type { Account, Category, Fund, Movement } from "@/types/domain";
 
@@ -87,8 +87,17 @@ describe("CSV import parsing", () => {
     expect(parseCsvAmount("-12,50")).toEqual({ amount: "12.50", sign: -1 });
     expect(parseCsvAmount("12.50")).toEqual({ amount: "12.50", sign: 1 });
     expect(parseCsvAmount("1.234,56")).toEqual({ amount: "1234.56", sign: 1 });
+    expect(parseCsvAmount("1,234.56")).toEqual({ amount: "1234.56", sign: 1 });
     expect(inferMovementType("", -1)).toBe("expense");
     expect(inferMovementType("", 1)).toBe("income");
+  });
+
+  it("returns null for malformed amounts without throwing", () => {
+    expect(parseCsvAmount("Spesa")).toBeNull();
+    expect(parseCsvAmount("abc")).toBeNull();
+    expect(parseCsvAmount("€")).toBeNull();
+    expect(parseCsvAmount("---")).toBeNull();
+    expect(parseCsvAmount("")).toBeNull();
   });
 
   it("maps CSV rows from selected columns", () => {
@@ -127,6 +136,154 @@ describe("CSV import parsing", () => {
       type: "expense",
       categoryId: "category-food",
       accountId: "account-bank"
+    });
+  });
+
+  it("keeps mapping by header name and not by column position", () => {
+    const parsed = parseCsv("Importo;Data;Descrizione\n-12,50;15/08/2026;Supermercato");
+    const preview = buildImportPreview({
+      rows: csvRowsToObjects(parsed),
+      mapping: {
+        columns: { amount: "Importo", date: "Data", description: "Descrizione" },
+        defaults: {
+          categoryId: "category-other",
+          containerId: "account:account-bank",
+          type: "expense",
+          sharedWithFamily: false,
+          householdId: null,
+          notes: ""
+        },
+        missingCategoryStrategy: "default"
+      },
+      categories,
+      accounts,
+      funds,
+      existingMovements: []
+    });
+
+    expect(preview.rows[0]?.movement).toMatchObject({
+      amount: "12.50",
+      occurredOn: "2026-08-15"
+    });
+  });
+
+  it("reports invalid amount when mapping amount to a text column", () => {
+    const parsed = parseCsv("Data;Tipo;Importo\n15/08/2026;Spesa;-12,50");
+    const preview = buildImportPreview({
+      rows: csvRowsToObjects(parsed),
+      mapping: {
+        columns: { date: "Data", amount: "Tipo", type: "Tipo" },
+        defaults: {
+          categoryId: "category-other",
+          containerId: "account:account-bank",
+          type: "expense",
+          sharedWithFamily: false,
+          householdId: null,
+          notes: ""
+        },
+        missingCategoryStrategy: "default"
+      },
+      categories,
+      accounts,
+      funds,
+      existingMovements: []
+    });
+
+    expect(preview.rows[0]?.valid).toBe(false);
+    expect(preview.rows[0]?.errors).toContain("Importo non valido");
+  });
+
+  it("allows repeated mapping changes without throwing", () => {
+    const parsed = parseCsv("Data;Tipo;Importo\n15/08/2026;Spesa;-12,50");
+    const rows = csvRowsToObjects(parsed);
+    const baseInput = {
+      rows,
+      categories,
+      accounts,
+      funds,
+      existingMovements: []
+    };
+
+    expect(() =>
+      buildImportPreview({
+        ...baseInput,
+        mapping: {
+          columns: { date: "Data", amount: "Tipo" },
+          defaults: {
+            categoryId: "category-other",
+            containerId: "account:account-bank",
+            type: "expense",
+            sharedWithFamily: false,
+            householdId: null,
+            notes: ""
+          },
+          missingCategoryStrategy: "default"
+        }
+      })
+    ).not.toThrow();
+
+    expect(() =>
+      buildImportPreview({
+        ...baseInput,
+        mapping: {
+          columns: { date: "Data", amount: "Importo" },
+          defaults: {
+            categoryId: "category-other",
+            containerId: "account:account-bank",
+            type: "expense",
+            sharedWithFamily: false,
+            householdId: null,
+            notes: ""
+          },
+          missingCategoryStrategy: "default"
+        }
+      })
+    ).not.toThrow();
+  });
+
+  it("parses semicolon CSV with decimal comma", () => {
+    const parsed = parseCsv("Data;Descrizione;Importo\n15/08/2026;Supermercato;-12,50");
+
+    expect(parsed.errors).toEqual([]);
+    expect(csvRowsToObjects(parsed)[0]).toMatchObject({
+      Data: "15/08/2026",
+      Importo: "-12,50"
+    });
+  });
+
+  it("parses quoted commas and escaped quotes", () => {
+    const parsed = parseCsv('data,descrizione,importo\n2026-08-15,"Supermercato, reparto ""bio""",-12.50');
+
+    expect(parsed.errors).toEqual([]);
+    expect(csvRowsToObjects(parsed)[0]).toMatchObject({
+      descrizione: 'Supermercato, reparto "bio"'
+    });
+  });
+
+  it("strips UTF-8 BOM from headers", () => {
+    const parsed = parseCsv("\uFEFFdata,descrizione,importo\n2026-08-15,Supermercato,-12.50");
+
+    expect(parsed.headers[0]).toBe("data");
+  });
+
+  it("reports inconsistent column counts", () => {
+    const parsed = parseCsv("data,descrizione,importo\n2026-08-15,Supermercato");
+
+    expect(parsed.errors).toContain("Riga 2: numero colonne 2, attese 3");
+  });
+
+  it("reports duplicated headers to avoid ambiguous object mapping", () => {
+    const parsed = parseCsv("data,importo,importo\n2026-08-15,-12.50,-99.00");
+
+    expect(parsed.errors).toContain("Intestazione duplicata: importo");
+  });
+
+  it("auto maps normalized header aliases", () => {
+    expect(inferInitialColumns([" DATA ", "Causale", "Valore", "condiviso_famiglia"])).toMatchObject({
+      amount: "Valore",
+      date: " DATA ",
+      description: "Causale",
+      shared: "condiviso_famiglia"
     });
   });
 

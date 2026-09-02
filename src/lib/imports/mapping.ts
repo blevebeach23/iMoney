@@ -1,5 +1,5 @@
 import type { Account, Category, Fund, Movement, MovementType } from "@/types/domain";
-import { normalizeDescription, normalizeText, parseCsvAmount, parseCsvDate, inferMovementType } from "./normalization";
+import { inferMovementType, normalizeDescription, normalizeHeader, normalizeText, parseCsvAmount, parseCsvDate } from "./normalization";
 
 export type ImportColumnKey = "date" | "description" | "amount" | "type" | "category" | "container" | "reimbursement" | "shared" | "notes";
 export type MissingCategoryStrategy = "default" | "create" | "skip";
@@ -48,6 +48,29 @@ export interface ImportPreview {
   validRows: number;
   skippedRows: number;
   duplicateCandidates: number;
+}
+
+const headerAliases: Record<ImportColumnKey, string[]> = {
+  amount: ["importo", "amount", "valore"],
+  category: ["categoria", "category"],
+  container: ["conto", "account", "fondo", "account_fund"],
+  date: ["data", "date"],
+  description: ["descrizione", "description", "causale"],
+  notes: ["note", "notes"],
+  reimbursement: ["rimborso", "reimbursement"],
+  shared: ["condiviso", "condiviso_famiglia", "shared", "shared_with_family"],
+  type: ["tipo", "type"]
+};
+
+export function inferInitialColumns(headers: string[]): Partial<Record<ImportColumnKey, string>> {
+  const normalizedHeaders = new Map(headers.map((header) => [normalizeHeader(header), header]));
+  const result: Partial<Record<ImportColumnKey, string>> = {};
+
+  for (const [field, aliases] of Object.entries(headerAliases) as Array<[ImportColumnKey, string[]]>) {
+    result[field] = aliases.map(normalizeHeader).map((alias) => normalizedHeaders.get(alias)).find(Boolean);
+  }
+
+  return result;
 }
 
 export function buildImportPreview(input: {

@@ -2,7 +2,7 @@ import type { MovementType } from "@/types/domain";
 import { formatMoney, toDecimal } from "@/lib/calculations/money";
 
 export function parseCsvDate(value: string): string | null {
-  const trimmed = value.trim();
+  const trimmed = safeString(value).trim();
   const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
   if (iso) {
     return validDate(Number(iso[1]), Number(iso[2]), Number(iso[3]));
@@ -17,7 +17,15 @@ export function parseCsvDate(value: string): string | null {
 }
 
 export function parseCsvAmount(value: string): { amount: string; sign: 1 | -1 } | null {
-  const compact = value.trim().replace(/\s/g, "");
+  const compact = safeString(value)
+    .trim()
+    .replace(/\s/g, "")
+    .replace(/[€$£]/g, "");
+
+  if (!compact || !/^[+-]?(?:\d{1,3}(?:[.,]\d{3})+|\d+)(?:[.,]\d{1,2})?$/.test(compact)) {
+    return null;
+  }
+
   const commaIndex = compact.lastIndexOf(",");
   const dotIndex = compact.lastIndexOf(".");
   const normalized =
@@ -26,7 +34,13 @@ export function parseCsvAmount(value: string): { amount: string; sign: 1 | -1 } 
         ? compact.replace(/\./g, "").replace(",", ".")
         : compact.replace(/,/g, "")
       : compact.replace(",", ".");
-  const decimal = toDecimal(normalized);
+
+  let decimal: ReturnType<typeof toDecimal>;
+  try {
+    decimal = toDecimal(normalized);
+  } catch {
+    return null;
+  }
 
   if (!decimal.isFinite() || decimal.isZero()) {
     return null;
@@ -61,11 +75,19 @@ export function normalizeDescription(value: string): string {
 }
 
 export function normalizeText(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim()
-    .toLowerCase();
+  try {
+    return safeString(value)
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+      .toLowerCase();
+  } catch {
+    return safeString(value).trim().toLowerCase();
+  }
+}
+
+export function normalizeHeader(value: string): string {
+  return normalizeText(value).replace(/[\s_-]+/g, "_");
 }
 
 function validDate(year: number, month: number, day: number): string | null {
@@ -75,4 +97,8 @@ function validDate(year: number, month: number, day: number): string | null {
   }
 
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function safeString(value: unknown): string {
+  return typeof value === "string" ? value : String(value ?? "");
 }

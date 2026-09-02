@@ -45,7 +45,7 @@ export async function getImportBatches(supabase: SupabaseClient, userId: string)
 }
 
 export async function confirmMovementImport(supabase: SupabaseClient, userId: string, input: ConfirmImportInput): Promise<ImportBatch> {
-  const rows = await resolveCreatedCategories(supabase, input.rows, input.macroCategoryIdForNew);
+  const rows = await resolveCreatedImportCategories(supabase, userId, input.rows, input.macroCategoryIdForNew);
 
   const { data: batch, error: batchError } = await supabase
     .from("import_batches")
@@ -138,40 +138,113 @@ export function getAffectedContainerIds(rows: Pick<ImportMovementInput, "account
   };
 }
 
-async function resolveCreatedCategories(
+export async function resolveCreatedImportCategories(
   supabase: SupabaseClient,
+  userId: string,
   rows: ImportMovementInput[],
   macroCategoryIdForNew: string | undefined
 ): Promise<ImportMovementInput[]> {
-  const newNames = [
-    ...new Map(
-      rows
-        .map((row) => row.createCategoryName?.trim())
-        .filter((name): name is string => Boolean(name))
-        .map((name) => [normalizeText(name), name])
-    ).values()
-  ];
+  const newNamesByNormalizedName = new Map<string, string>();
+  for (const row of rows) {
+    const name = row.createCategoryName?.trim();
+    if (name) {
+      newNamesByNormalizedName.set(normalizeText(name), name);
+    }
+  }
+  const newNames = [...newNamesByNormalizedName.values()];
 
   if (newNames.length === 0) {
     return rows;
   }
 
-  if (!macroCategoryIdForNew) {
-    throw new Error("Macro-categoria richiesta per creare nuove categorie");
+  const targetMacroCategoryId = macroCategoryIdForNew ?? await ensureImportOtherMacroCategory(supabase, userId);
+  const categoryIdByName = await getCategoryIdsByNormalizedName(supabase, targetMacroCategoryId);
+  const namesToCreate = newNames.filter((name) => !categoryIdByName.has(normalizeText(name)));
+
+  if (namesToCreate.length > 0) {
+    const { error } = await supabase
+      .from("categories")
+      .insert(namesToCreate.map((name, index) => ({ macro_category_id: targetMacroCategoryId, name, sort_order: 1000 + index })))
+      .select("id, name");
+
+    if (error) {
+      const existingAfterConflict = await getCategoryIdsByNormalizedName(supabase, targetMacroCategoryId);
+      const unresolved = namesToCreate.filter((name) => !existingAfterConflict.has(normalizeText(name)));
+      if (unresolved.length > 0) {
+        throw error;
+      }
+      for (const [name, id] of existingAfterConflict.entries()) {
+        categoryIdByName.set(name, id);
+      }
+    } else {
+      const created = await getCategoryIdsByNormalizedName(supabase, targetMacroCategoryId);
+      for (const [name, id] of created.entries()) {
+        categoryIdByName.set(name, id);
+      }
+    }
+  }
+
+  return rows.map((row) => {
+    if (!row.createCategoryName) {
+      return row;
+    }
+
+    const categoryId = categoryIdByName.get(normalizeText(row.createCategoryName));
+    return categoryId ? { ...row, categoryId } : row;
+  });
+}
+
+export async function ensureImportOtherMacroCategory(supabase: SupabaseClient, userId: string): Promise<string> {
+  const existingMacroId = await findImportOtherMacroCategoryId(supabase, userId);
+  if (existingMacroId) {
+    return existingMacroId;
   }
 
   const { data, error } = await supabase
-    .from("categories")
-    .insert(newNames.map((name, index) => ({ macro_category_id: macroCategoryIdForNew, name, sort_order: 1000 + index })))
-    .select("id, name");
+    .from("macro_categories")
+    .insert({ owner_user_id: userId, name: "Altro", sort_order: 1000 })
+    .select("id")
+    .single();
+
+  if (!error && data) {
+    return String((data as Row).id);
+  }
+
+  const macroIdAfterConflict = await findImportOtherMacroCategoryId(supabase, userId);
+  if (macroIdAfterConflict) {
+    return macroIdAfterConflict;
+  }
+
+  throw error ?? new Error("Macro-categoria Altro non disponibile");
+}
+
+async function findImportOtherMacroCategoryId(supabase: SupabaseClient, userId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("macro_categories")
+    .select("id, name")
+    .eq("owner_user_id", userId)
+    .is("deleted_at", null);
 
   if (error) {
     throw error;
   }
 
-  const createdByName = new Map((data ?? []).map((row: Row) => [String(row.name), String(row.id)]));
+  const row = (data ?? []).find((item: Row) => normalizeText(String(item.name ?? "")) === "altro");
+  return row ? String(row.id) : null;
+}
 
-  return rows.map((row) => (row.createCategoryName ? { ...row, categoryId: createdByName.get(row.createCategoryName) ?? row.categoryId } : row));
+async function getCategoryIdsByNormalizedName(supabase: SupabaseClient, macroCategoryId: string): Promise<Map<string, string>> {
+  const { data, error } = await supabase
+    .from("categories")
+    .select("id, name")
+    .eq("macro_category_id", macroCategoryId)
+    .is("deleted_at", null);
+
+  if (error) {
+    throw error;
+  }
+
+  return new Map((data ?? []).map((row: Row) => [normalizeText(String(row.name ?? "")), String(row.id)]));
 }
 
 function mapImportBatchRow(row: Row): ImportBatch {

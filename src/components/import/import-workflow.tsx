@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { confirmImportAction, undoImportBatchAction } from "@/lib/imports/actions";
 import { csvRowsToObjects, parseCsv } from "@/lib/imports/csv";
-import { buildImportPreview, type ImportColumnKey, type ImportMapping, type ImportPreview } from "@/lib/imports/mapping";
+import { buildImportPreview, inferInitialColumns, type ImportColumnKey, type ImportMapping, type ImportPreview } from "@/lib/imports/mapping";
 import type { ActiveHouseholdOption } from "@/services/households/household-service";
 import type { CategoryTreeItem } from "@/services/categories/category-service";
 import type { Account, Category, Fund, ImportBatch, Movement } from "@/types/domain";
@@ -33,21 +33,6 @@ function containerOptions(accounts: Account[], funds: Fund[]) {
   ];
 }
 
-function initialColumns(headers: string[]): Partial<Record<ImportColumnKey, string>> {
-  const lowerHeaders = new Map(headers.map((header) => [header.trim().toLowerCase(), header]));
-  return {
-    date: lowerHeaders.get("data") ?? lowerHeaders.get("date"),
-    description: lowerHeaders.get("descrizione") ?? lowerHeaders.get("description") ?? lowerHeaders.get("causale"),
-    amount: lowerHeaders.get("importo") ?? lowerHeaders.get("amount"),
-    type: lowerHeaders.get("tipo") ?? lowerHeaders.get("type"),
-    category: lowerHeaders.get("categoria") ?? lowerHeaders.get("category"),
-    container: lowerHeaders.get("conto") ?? lowerHeaders.get("account") ?? lowerHeaders.get("fondo"),
-    reimbursement: lowerHeaders.get("rimborso"),
-    shared: lowerHeaders.get("condiviso"),
-    notes: lowerHeaders.get("note")
-  };
-}
-
 export function ImportWorkflow({
   accounts,
   batches,
@@ -66,11 +51,11 @@ export function ImportWorkflow({
   const [filename, setFilename] = useState("");
   const [headers, setHeaders] = useState<string[]>([]);
   const [rows, setRows] = useState<Array<Record<string, string>>>([]);
+  const [parseErrors, setParseErrors] = useState<string[]>([]);
   const [columns, setColumns] = useState<Partial<Record<ImportColumnKey, string>>>({});
   const [defaultCategoryId, setDefaultCategoryId] = useState(flattenCategories(categoryTree)[0]?.id ?? "");
   const [defaultContainerId, setDefaultContainerId] = useState(containerOptions(accounts, funds)[0]?.value ?? "");
-  const [missingCategoryStrategy, setMissingCategoryStrategy] = useState<ImportMapping["missingCategoryStrategy"]>("default");
-  const [macroCategoryIdForNew, setMacroCategoryIdForNew] = useState(categoryTree[0]?.id ?? "");
+  const [missingCategoryStrategy, setMissingCategoryStrategy] = useState<ImportMapping["missingCategoryStrategy"]>("create");
   const [allowDuplicates, setAllowDuplicates] = useState(false);
   const defaultHousehold = households[0];
   const categories = useMemo(() => flattenCategories(categoryTree), [categoryTree]);
@@ -85,17 +70,27 @@ export function ImportWorkflow({
         type: "expense",
         sharedWithFamily: Boolean(defaultHousehold?.shareByDefault),
         householdId: defaultHousehold?.id ?? null,
-        notes: "",
-        macroCategoryIdForNew
+        notes: ""
       },
       missingCategoryStrategy
     }),
-    [columns, defaultCategoryId, defaultContainerId, defaultHousehold?.id, defaultHousehold?.shareByDefault, macroCategoryIdForNew, missingCategoryStrategy]
+    [columns, defaultCategoryId, defaultContainerId, defaultHousehold?.id, defaultHousehold?.shareByDefault, missingCategoryStrategy]
   );
-  const preview: ImportPreview | null = useMemo(
-    () => (rows.length > 0 ? buildImportPreview({ rows, mapping, categories, accounts, funds, existingMovements }) : null),
-    [accounts, categories, existingMovements, funds, mapping, rows]
+  const previewResult: { preview: ImportPreview | null; error: string | null } = useMemo(() => {
+    if (rows.length === 0 || parseErrors.length > 0) {
+      return { preview: null, error: null };
+    }
+
+    try {
+      return { preview: buildImportPreview({ rows, mapping, categories, accounts, funds, existingMovements }), error: null };
+    } catch (error) {
+      console.error("CSV import preview failed", error);
+      return { preview: null, error: "Il file non può essere interpretato correttamente. Controlla separatore e intestazioni." };
+    }
+  },
+    [accounts, categories, existingMovements, funds, mapping, parseErrors.length, rows]
   );
+  const preview = previewResult.preview;
   const rowsToImport = preview?.rows.filter((row) => row.valid && row.movement && (allowDuplicates || !row.duplicateCandidate)).map((row) => row.movement) ?? [];
   const canImport = rowsToImport.length > 0 && Boolean(defaultCategoryId) && Boolean(defaultContainerId);
 
@@ -104,12 +99,22 @@ export function ImportWorkflow({
       return;
     }
 
-    const text = await file.text();
-    const parsed = parseCsv(text);
-    setFilename(file.name);
-    setHeaders(parsed.headers);
-    setRows(csvRowsToObjects(parsed));
-    setColumns(initialColumns(parsed.headers));
+    try {
+      const text = await file.text();
+      const parsed = parseCsv(text);
+      setFilename(file.name);
+      setHeaders(parsed.headers);
+      setParseErrors(parsed.errors);
+      setRows(parsed.errors.length > 0 ? [] : csvRowsToObjects(parsed));
+      setColumns(inferInitialColumns(parsed.headers));
+    } catch (error) {
+      console.error("CSV import parsing failed", error);
+      setFilename(file.name);
+      setHeaders([]);
+      setRows([]);
+      setColumns({});
+      setParseErrors(["Il file non può essere interpretato correttamente. Controlla separatore e intestazioni."]);
+    }
   }
 
   return (
@@ -126,6 +131,14 @@ export function ImportWorkflow({
           className="block w-full text-sm file:mr-3 file:min-h-11 file:rounded-md file:border-0 file:bg-primary file:px-4 file:text-sm file:font-semibold file:text-white"
         />
         {filename && <p className="text-sm font-semibold text-zinc-600">{filename}: {rows.length} righe lette</p>}
+        {parseErrors.length > 0 && (
+          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm leading-6 text-red-700">
+            <p className="font-semibold">Il file non può essere interpretato correttamente.</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              {parseErrors.slice(0, 6).map((error) => <li key={error}>{error}</li>)}
+            </ul>
+          </div>
+        )}
       </section>
 
       {headers.length > 0 && (
@@ -159,14 +172,11 @@ export function ImportWorkflow({
             value={missingCategoryStrategy}
             onChange={(value) => setMissingCategoryStrategy(value as ImportMapping["missingCategoryStrategy"])}
             options={[
+              { value: "create", label: "Crea nuova categoria in Altro" },
               { value: "default", label: "Usa categoria default" },
-              { value: "create", label: "Crea nuova categoria" },
               { value: "skip", label: "Salta riga" }
             ]}
           />
-          {missingCategoryStrategy === "create" && (
-            <Select label="Macro per nuove categorie" value={macroCategoryIdForNew} onChange={setMacroCategoryIdForNew} options={categoryTree.map((macro) => ({ value: macro.id, label: macro.name }))} />
-          )}
           {preview && preview.duplicateCandidates > 0 && (
             <label className="flex min-h-12 items-center gap-3 rounded-md border border-border px-3">
               <input type="checkbox" checked={allowDuplicates} onChange={(event) => setAllowDuplicates(event.target.checked)} className="h-5 w-5" />
@@ -205,12 +215,18 @@ export function ImportWorkflow({
             ))}
           </div>
           <form action={confirmImportAction}>
-            <input type="hidden" name="payload" value={JSON.stringify({ filename, rows: rowsToImport, macroCategoryIdForNew })} />
+            <input type="hidden" name="payload" value={JSON.stringify({ filename, rows: rowsToImport })} />
             <Button type="submit" disabled={!canImport} className="w-full">
               <Upload aria-hidden className="h-4 w-4" />
               Conferma import
             </Button>
           </form>
+        </section>
+      )}
+
+      {previewResult.error && (
+        <section className="rounded-md border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-700">
+          {previewResult.error}
         </section>
       )}
 
