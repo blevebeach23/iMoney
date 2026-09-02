@@ -62,6 +62,7 @@ function formDataToFixedExpenseObject(formData: FormData) {
 function formDataToFixedExpenseRequestObject(formData: FormData) {
   return {
     description: String(formData.get("description") ?? ""),
+    categoryId: String(formData.get("categoryId") ?? ""),
     amount: String(formData.get("amount") ?? ""),
     startsOn: String(formData.get("startsOn") ?? ""),
     endsOn: String(formData.get("endsOn") ?? ""),

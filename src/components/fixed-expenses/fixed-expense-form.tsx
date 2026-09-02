@@ -108,10 +108,10 @@ export function FixedExpenseForm({
         />
       )}
       <TextField label="Descrizione" name="description" defaultValue={fixedExpense?.description ?? ""} errors={state.fieldErrors} />
-      {!isRequestForOtherMember && <SelectField label="Categoria" name="categoryId" defaultValue={fixedExpense?.categoryId ?? categories[0]?.value} options={categories} errors={state.fieldErrors} />}
+      <SelectField label="Categoria" name="categoryId" defaultValue={fixedExpense?.categoryId ?? categories[0]?.value} options={categories} errors={state.fieldErrors} />
       <TextField label="Importo" name="amount" defaultValue={fixedExpense?.amount ?? ""} inputMode="decimal" errors={state.fieldErrors} />
       {isRequestForOtherMember ? (
-        <p className="rounded-md border border-border bg-white p-3 text-sm leading-6 text-zinc-600">Il destinatario sceglierà categoria e conto o fondo quando accetta.</p>
+        <p className="rounded-md border border-border bg-white p-3 text-sm leading-6 text-zinc-600">Il destinatario sceglierà conto o fondo quando accetta.</p>
       ) : (
         <SelectField label="Conto / Fondo" name="containerId" defaultValue={containerValue} options={containers} errors={state.fieldErrors} />
       )}

@@ -54,6 +54,7 @@ export type FixedExpenseFormInput = z.infer<typeof fixedExpenseFormSchema>;
 export const fixedExpenseRequestFormSchema = z
   .object({
     description: z.string().trim().min(1, "Descrizione obbligatoria").max(160, "Descrizione troppo lunga"),
+    categoryId: z.string().uuid("Categoria obbligatoria"),
     amount: z
       .string()
       .trim()
@@ -86,7 +87,11 @@ export const fixedExpenseRequestFormSchema = z
 export const fixedExpenseRequestDecisionSchema = z
   .object({
     requestId: z.string().uuid(),
-    categoryId: z.string().uuid("Categoria obbligatoria"),
+    categoryId: z
+      .string()
+      .trim()
+      .transform((value) => (value === "" ? null : value))
+      .pipe(z.string().uuid("Categoria obbligatoria").nullable()),
     containerId: z.string().min(1, "Conto o fondo obbligatorio"),
     accountId: z.string().uuid().nullable(),
     fundId: z.string().uuid().nullable()

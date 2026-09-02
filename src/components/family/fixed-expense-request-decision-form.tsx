@@ -35,8 +35,9 @@ export function FixedExpenseRequestDecisionForm({
   const [state, action] = useFormState(acceptFixedExpenseRequestAction, initialState);
   const categories = categoryOptions(categoryTree);
   const containers = containerOptions(accounts, funds);
+  const needsLegacyCategory = !request.categoryId;
 
-  if (categories.length === 0 || containers.length === 0) {
+  if ((needsLegacyCategory && categories.length === 0) || containers.length === 0) {
     return <p className="rounded-md border border-dashed border-border bg-white p-4 text-sm leading-6 text-zinc-600">Per accettare servono almeno una categoria e un conto o fondo personale.</p>;
   }
 
@@ -44,7 +45,16 @@ export function FixedExpenseRequestDecisionForm({
     <form action={action} className="space-y-3 rounded-md border border-border bg-white p-4 shadow-panel">
       <FormMessage state={state} />
       <input type="hidden" name="requestId" value={request.id} />
-      <SelectField label="Categoria personale" name="categoryId" defaultValue={categories[0]?.value} options={categories} errors={state.fieldErrors} />
+      {request.categoryId ? (
+        <>
+          <input type="hidden" name="categoryId" value="" />
+          <p className="rounded-md border border-border bg-zinc-50 p-3 text-sm leading-6 text-zinc-700">
+            Categoria: <span className="font-semibold">{request.categoryLabel ?? "Categoria proposta"}</span>
+          </p>
+        </>
+      ) : (
+        <SelectField label="Categoria personale" name="categoryId" defaultValue={categories[0]?.value} options={categories} errors={state.fieldErrors} />
+      )}
       <SelectField label="Conto / Fondo personale" name="containerId" defaultValue={containers[0]?.value} options={containers} errors={state.fieldErrors} />
       <PendingButton>
         <Check aria-hidden className="h-4 w-4" />

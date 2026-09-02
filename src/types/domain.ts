@@ -110,6 +110,8 @@ export interface FixedExpenseRequest {
   recipientName: string;
   description: string;
   amount: MoneyAmount;
+  categoryId: string | null;
+  categoryLabel: string | null;
   startsOn: string;
   endsOn: string | null;
   dayOfMonth: number;

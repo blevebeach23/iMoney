@@ -143,10 +143,11 @@ describe("fixed expense scheduling", () => {
     expect(balances.forecastMonthEnd[0]?.balance).toBe("800.00");
   });
 
-  it("validates fixed expense requests without exposing recipient containers or category", () => {
+  it("validates fixed expense requests with creator category and without exposing recipient containers", () => {
     const parsed = fixedExpenseRequestFormSchema.parse({
       activeMonths: ["1", "2"],
       amount: "45,00",
+      categoryId: "11111111-1111-4111-8111-111111111111",
       dayOfMonth: "10",
       description: "Palestra",
       endsOn: "",
@@ -160,14 +161,14 @@ describe("fixed expense scheduling", () => {
     expect(parsed.amount).toBe("45.00");
     expect(parsed).not.toHaveProperty("accountId");
     expect(parsed).not.toHaveProperty("fundId");
-    expect(parsed).not.toHaveProperty("categoryId");
+    expect(parsed.categoryId).toBe("11111111-1111-4111-8111-111111111111");
   });
 
-  it("requires recipient category and container when accepting a fixed expense request", () => {
+  it("requires only recipient container when accepting a fixed expense request with a category already selected", () => {
     expect(
       fixedExpenseRequestDecisionSchema.safeParse({
         accountId: "22222222-2222-4222-8222-222222222222",
-        categoryId: "11111111-1111-4111-8111-111111111111",
+        categoryId: "",
         containerId: "account:22222222-2222-4222-8222-222222222222",
         fundId: null,
         requestId: "55555555-5555-4555-8555-555555555555"
@@ -176,7 +177,7 @@ describe("fixed expense scheduling", () => {
     expect(
       fixedExpenseRequestDecisionSchema.safeParse({
         accountId: null,
-        categoryId: "11111111-1111-4111-8111-111111111111",
+        categoryId: "",
         containerId: "",
         fundId: null,
         requestId: "55555555-5555-4555-8555-555555555555"

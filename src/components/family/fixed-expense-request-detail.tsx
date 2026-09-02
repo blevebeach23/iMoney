@@ -69,7 +69,8 @@ export function FixedExpenseRequestDetail({
           {request.endsOn && <div><dt className="font-semibold text-zinc-500">Fine</dt><dd>{formatDate(request.endsOn)}</dd></div>}
           <div><dt className="font-semibold text-zinc-500">Giorno del mese</dt><dd>{request.dayOfMonth}</dd></div>
           <div><dt className="font-semibold text-zinc-500">Mesi attivi</dt><dd>{activeMonthsLabel(request.activeMonths)}</dd></div>
-          <div><dt className="font-semibold text-zinc-500">Categoria e conto/fondo</dt><dd>Da scegliere in accettazione</dd></div>
+          <div><dt className="font-semibold text-zinc-500">Categoria</dt><dd>{request.categoryLabel ?? "Da scegliere in accettazione"}</dd></div>
+          <div><dt className="font-semibold text-zinc-500">Conto/fondo</dt><dd>Da scegliere in accettazione</dd></div>
           <div><dt className="font-semibold text-zinc-500">Condivisione</dt><dd>Condivisa con famiglia dopo accettazione</dd></div>
           {request.notes && <div><dt className="font-semibold text-zinc-500">Note</dt><dd className="whitespace-pre-wrap">{request.notes}</dd></div>}
         </dl>

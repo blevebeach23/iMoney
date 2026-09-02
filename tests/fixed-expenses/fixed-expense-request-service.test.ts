@@ -48,6 +48,8 @@ function request(partial: Partial<FixedExpenseRequest> = {}): FixedExpenseReques
     createdAt: "2026-09-01T10:00:00Z",
     createdByUserId: "creator-1",
     creatorName: "Vito",
+    categoryId: "20000000-0000-4000-8000-000000000011",
+    categoryLabel: "Casa / Palestra",
     dayOfMonth: 10,
     description: "Palestra",
     endsOn: null,
@@ -121,6 +123,7 @@ describe("fixed expense request service", () => {
     await createFixedExpenseRequest(supabase, "creator-1", {
       activeMonths: [1, 2, 3],
       amount: "45.00",
+      categoryId: "20000000-0000-4000-8000-000000000011",
       dayOfMonth: 10,
       description: "Palestra",
       endsOn: null,
@@ -132,6 +135,7 @@ describe("fixed expense request service", () => {
     });
 
     expect(supabase.rpc).toHaveBeenCalledWith("create_fixed_expense_request", expect.objectContaining({
+      request_category_id: "20000000-0000-4000-8000-000000000011",
       target_recipient_user_id: "40000000-0000-4000-8000-000000000010",
       request_amount: "45.00"
     }));
@@ -146,7 +150,7 @@ describe("fixed expense request service", () => {
     const supabase = rpcSupabase();
     const acceptedFixedExpenseId = await acceptFixedExpenseRequest(supabase, "recipient-1", request(), {
       accountId: "50000000-0000-4000-8000-000000000010",
-      categoryId: "20000000-0000-4000-8000-000000000011",
+      categoryId: null,
       containerId: "account:50000000-0000-4000-8000-000000000010",
       fundId: null,
       requestId: "10000000-0000-4000-8000-000000000020"
@@ -155,6 +159,7 @@ describe("fixed expense request service", () => {
     expect(acceptedFixedExpenseId).toBe("10000000-0000-4000-8000-000000000021");
     expect(supabase.rpc).toHaveBeenCalledWith("accept_fixed_expense_request", expect.objectContaining({
       accepted_account_id: "50000000-0000-4000-8000-000000000010",
+      accepted_category_id: null,
       accepted_fund_id: null
     }));
     expect(generateFixedExpenseMovements).toHaveBeenCalledWith(

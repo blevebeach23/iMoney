@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const root = process.cwd();
 const migration = readFileSync(join(root, "supabase", "migrations", "033_fixed_expense_requests.sql"), "utf8");
+const creatorCategoryMigration = readFileSync(join(root, "supabase", "migrations", "034_fixed_expense_request_creator_category.sql"), "utf8");
 
 describe("fixed expense request migration", () => {
   it("keeps pending requests outside fixed expenses and movements until acceptance", () => {
@@ -29,6 +30,14 @@ describe("fixed expense request migration", () => {
     expect(migration).toContain("public.user_can_access_account(accepted_account_id, auth.uid(), target_request.household_id)");
     expect(migration).toContain("public.user_can_access_fund(accepted_fund_id, auth.uid(), target_request.household_id)");
     expect(migration).toContain("public.user_can_access_category(accepted_category_id, auth.uid(), target_request.household_id)");
+  });
+
+  it("stores the fixed expense request category at creation and keeps recipient container selection at acceptance", () => {
+    expect(creatorCategoryMigration).toContain("add column if not exists category_id uuid references public.categories");
+    expect(creatorCategoryMigration).toContain("request_category_id uuid");
+    expect(creatorCategoryMigration).toContain("Recipient category access denied");
+    expect(creatorCategoryMigration).toContain("selected_category_id := coalesce(target_request.category_id, accepted_category_id)");
+    expect(creatorCategoryMigration).toContain("selected_category_id,");
   });
 
   it("makes accept idempotent and blocks closed request mutation", () => {
