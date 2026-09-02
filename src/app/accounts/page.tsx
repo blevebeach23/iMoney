@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { AccountManager } from "@/components/master-data/account-manager";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAccounts } from "@/services/accounts/account-service";
+import { getCreditCardSettingsForUser } from "@/services/credit-cards/credit-card-service";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ export default async function AccountsPage() {
     redirect("/login");
   }
 
-  const accounts = await getAccounts(supabase, user.id);
+  const [accounts, creditCardSettings] = await Promise.all([getAccounts(supabase, user.id), getCreditCardSettingsForUser(supabase, user.id)]);
 
   return (
     <main className="mx-auto min-h-dvh max-w-md px-4 pb-24 pt-6">
@@ -24,7 +25,7 @@ export default async function AccountsPage() {
         <h1 className="mt-2 text-3xl font-bold tracking-normal text-foreground">Conti</h1>
         <p className="mt-2 text-sm leading-6 text-zinc-600">Gestisci i contenitori finanziari personali usati dai movimenti.</p>
       </header>
-      <AccountManager accounts={accounts} />
+      <AccountManager accounts={accounts} creditCardSettings={creditCardSettings} />
     </main>
   );
 }

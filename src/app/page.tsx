@@ -11,6 +11,7 @@ import { shortUserName } from "@/lib/profiles/display-name";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAccounts } from "@/services/accounts/account-service";
 import { getPersonalBudgetsForMonth } from "@/services/budgets/budget-service";
+import { buildVirtualCreditCardSettlementTransfers, generateDueCreditCardSettlements, getCreditCardForecasts, getCreditCardSettingsForUser } from "@/services/credit-cards/credit-card-service";
 import { getFunds } from "@/services/funds/fund-service";
 import { getMovementCategoryInfo, getMonthlyMovements, getMovementsBetween, getMovementsUntil } from "@/services/movements/movement-service";
 import { getTransfersUntil } from "@/services/transfers/transfer-service";
@@ -44,7 +45,7 @@ export default async function Home({ searchParams }: Readonly<{ searchParams: Re
 
   const range = monthRangeFromYearMonth(firstParam(searchParams.month) ?? formatYearMonth(new Date()));
   const year = Number(range.yearMonth.slice(0, 4));
-  const [accounts, budgets, funds, monthMovements, movementsUntilMonthEnd, yearMovements, transfersUntilMonthEnd, categoryInfo] = await Promise.all([
+  const [accounts, budgets, funds, monthMovements, movementsUntilMonthEnd, yearMovements, initialTransfersUntilMonthEnd, categoryInfo, creditCardSettings] = await Promise.all([
     getAccounts(supabase, user.id),
     getPersonalBudgetsForMonth(supabase, user.id, range.monthStart),
     getFunds(supabase, user.id),
@@ -52,10 +53,29 @@ export default async function Home({ searchParams }: Readonly<{ searchParams: Re
     getMovementsUntil(supabase, user.id, range.monthEnd),
     getMovementsBetween(supabase, user.id, `${year}-01-01`, `${year}-12-31`),
     getTransfersUntil(supabase, user.id, range.monthEnd),
-    getMovementCategoryInfo(supabase, user.id)
+    getMovementCategoryInfo(supabase, user.id),
+    getCreditCardSettingsForUser(supabase, user.id)
   ]);
+  const createdSettlements = await generateDueCreditCardSettlements(supabase, user.id, {
+    accounts,
+    settings: creditCardSettings,
+    movements: movementsUntilMonthEnd,
+    transfers: initialTransfersUntilMonthEnd,
+    today: range.today
+  });
+  const transfersUntilMonthEnd = createdSettlements > 0 ? await getTransfersUntil(supabase, user.id, range.monthEnd) : initialTransfersUntilMonthEnd;
   const summary = calculateMonthlySummary(monthMovements);
-  const balances = calculateFinancialBalances(accounts, funds, movementsUntilMonthEnd, transfersUntilMonthEnd, range.today, range.monthEnd);
+  const currentBalances = calculateFinancialBalances(accounts, funds, movementsUntilMonthEnd, transfersUntilMonthEnd, range.today, range.today);
+  const creditCardForecasts = getCreditCardForecasts({
+    accounts,
+    settings: creditCardSettings,
+    movements: movementsUntilMonthEnd,
+    transfers: transfersUntilMonthEnd,
+    today: range.today,
+    bankBalances: currentBalances.bank
+  });
+  const virtualSettlementTransfers = buildVirtualCreditCardSettlementTransfers(user.id, creditCardForecasts, transfersUntilMonthEnd).filter((transfer) => transfer.occurredOn <= range.monthEnd);
+  const balances = calculateFinancialBalances(accounts, funds, movementsUntilMonthEnd, [...transfersUntilMonthEnd, ...virtualSettlementTransfers], range.today, range.monthEnd);
   const budgetReport = calculateBudgetReport(budgets, monthMovements, categoryInfo);
   const categoryAggregates = calculateCategoryAggregates(monthMovements, categoryInfo);
   const upcomingMovements = getUpcomingMovements(monthMovements, range.today);
@@ -73,6 +93,7 @@ export default async function Home({ searchParams }: Readonly<{ searchParams: Re
         annualTrend={annualTrend}
         balances={balances}
         budgetReport={budgetReport}
+        creditCardForecasts={creditCardForecasts}
         macroCategoryAggregates={categoryAggregates.macroCategories}
         monthLabel={formatMonthLabel(range.monthStart)}
         selectedMonth={range.yearMonth}

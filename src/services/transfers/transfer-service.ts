@@ -158,7 +158,10 @@ function mapTransferRow(row: TransferRow): Transfer {
     occurredOn: String(row.occurred_on),
     description: String(row.description ?? ""),
     createdAt: row.created_at ? String(row.created_at) : null,
-    deletedAt: row.deleted_at ? String(row.deleted_at) : null
+    deletedAt: row.deleted_at ? String(row.deleted_at) : null,
+    creditCardAccountId: row.credit_card_account_id ? String(row.credit_card_account_id) : null,
+    creditCardCycleStartOn: row.credit_card_cycle_start_on ? String(row.credit_card_cycle_start_on) : null,
+    creditCardCycleEndOn: row.credit_card_cycle_end_on ? String(row.credit_card_cycle_end_on) : null
   };
 }
 

@@ -4,6 +4,7 @@ import type { AnnualTrendPoint } from "@/lib/calculations/annual-trend";
 import type { BudgetReport } from "@/lib/calculations/budget";
 import type { MacroCategoryAggregate } from "@/lib/calculations/category-aggregates";
 import type { FinancialBalances } from "@/lib/calculations/balances";
+import type { CreditCardForecast } from "@/lib/calculations/credit-card-settlements";
 import { calculateMonthlySummary } from "@/lib/calculations/monthly-summary";
 import type { MonthlySummary, Movement } from "@/types/domain";
 import { BudgetProgress } from "@/components/budgets/budget-progress";
@@ -92,6 +93,7 @@ interface DashboardPreviewProps {
   annualTrend?: AnnualTrendPoint[];
   balances?: FinancialBalances;
   budgetReport?: BudgetReport;
+  creditCardForecasts?: CreditCardForecast[];
   macroCategoryAggregates?: MacroCategoryAggregate[];
   monthLabel?: string;
   selectedMonth?: string;
@@ -112,6 +114,7 @@ export function DashboardPreview({
   annualTrend = [],
   balances,
   budgetReport,
+  creditCardForecasts = [],
   macroCategoryAggregates = [],
   monthLabel = "Agosto 2026",
   selectedMonth = "2026-08",
@@ -198,6 +201,46 @@ export function DashboardPreview({
           <BalanceRow key={item.accountId} icon={CreditCard} label={`${item.name} da addebitare`} value={item.due} />
         ))}
       </section>
+
+      {creditCardForecasts.length > 0 && (
+        <section className="mt-6 space-y-3">
+          <h2 className="text-lg font-semibold text-foreground">Carte di credito</h2>
+          {creditCardForecasts.map((forecast) => (
+            <article key={forecast.accountId} className="rounded-md border border-border bg-white p-4 shadow-panel">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="font-bold">{forecast.accountName}</h3>
+                  <p className="mt-1 text-sm text-zinc-600">Addebito su {forecast.settlementAccountName}</p>
+                </div>
+                <span className="rounded-md bg-zinc-100 px-2 py-1 text-xs font-semibold">{forecast.automaticSettlement ? "Automatico" : "Manuale"}</span>
+              </div>
+              <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <dt className="text-zinc-500">Da addebitare</dt>
+                  <dd className="font-semibold tabular-nums">EUR {forecast.amountDue}</dd>
+                </div>
+                <div>
+                  <dt className="text-zinc-500">Prossimo addebito</dt>
+                  <dd className="font-semibold">{formatDate(forecast.paymentOn)}</dd>
+                </div>
+                <div>
+                  <dt className="text-zinc-500">Ciclo</dt>
+                  <dd className="font-semibold">{formatDate(forecast.cycleStartOn)} - {formatDate(forecast.cycleEndOn)}</dd>
+                </div>
+                <div>
+                  <dt className="text-zinc-500">Nuovo ciclo</dt>
+                  <dd className="font-semibold tabular-nums">EUR {forecast.nextCycleAmount}</dd>
+                </div>
+              </dl>
+              {forecast.insufficientFunds && (
+                <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
+                  Fondi insufficienti per il prossimo addebito {forecast.accountName}: mancano EUR {forecast.missingAmount}
+                </p>
+              )}
+            </article>
+          ))}
+        </section>
+      )}
 
       <section className="mt-6 space-y-3">
         <h2 className="text-lg font-semibold text-foreground">Fondi principali</h2>

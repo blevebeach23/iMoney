@@ -70,3 +70,14 @@ export const categoryFormSchema = z.object({
   name: z.string().trim().min(1, "Nome obbligatorio").max(80, "Nome troppo lungo"),
   sortOrder: z.coerce.number().int().min(0, "Ordine non valido")
 });
+
+export const creditCardSettingsFormSchema = z.object({
+  accountId: z.string().uuid("Carta obbligatoria"),
+  settlementAccountId: z.string().uuid("Conto di addebito obbligatorio"),
+  statementClosingDay: z.coerce.number().int().min(1, "Giorno non valido").max(31, "Giorno non valido"),
+  paymentDay: z.coerce.number().int().min(1, "Giorno non valido").max(31, "Giorno non valido"),
+  automaticSettlement: z.boolean()
+}).refine((value) => value.accountId !== value.settlementAccountId, {
+  message: "La carta e il conto di addebito devono essere diversi",
+  path: ["settlementAccountId"]
+});

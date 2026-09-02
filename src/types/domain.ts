@@ -101,6 +101,17 @@ export interface MovementRequest {
   respondedAt: string | null;
 }
 
+export interface CreditCardSettings {
+  id: string;
+  accountId: string;
+  settlementAccountId: string;
+  statementClosingDay: number;
+  paymentDay: number;
+  automaticSettlement: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface FixedExpenseRequest {
   id: string;
   householdId: string;
@@ -155,6 +166,9 @@ export interface Transfer {
   description: string;
   createdAt?: string | null;
   deletedAt: string | null;
+  creditCardAccountId?: string | null;
+  creditCardCycleStartOn?: string | null;
+  creditCardCycleEndOn?: string | null;
 }
 
 export type BudgetOwnerType = "USER" | "HOUSEHOLD";

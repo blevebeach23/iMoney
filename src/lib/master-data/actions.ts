@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import {
   accountFormSchema,
   categoryFormSchema,
+  creditCardSettingsFormSchema,
   fundFormSchema,
   macroCategoryFormSchema
 } from "@/lib/master-data/validation";
@@ -23,6 +24,7 @@ import {
   updateMacroCategory
 } from "@/services/categories/category-service";
 import { createFund, deactivateFund, updateFund } from "@/services/funds/fund-service";
+import { deleteCreditCardSettings, saveCreditCardSettings } from "@/services/credit-cards/credit-card-service";
 import { notifySharedFund } from "@/services/notifications/notification-service";
 import { toFieldErrors, type FormState } from "@/lib/auth/validation";
 
@@ -78,6 +80,38 @@ export async function deactivateAccountAction(formData: FormData) {
   const { supabase, user } = await requireUser();
   await deactivateAccount(supabase, user.id, accountId);
   revalidatePath("/accounts");
+}
+
+export async function saveCreditCardSettingsAction(_prevState: FormState, formData: FormData): Promise<FormState> {
+  const parsed = creditCardSettingsFormSchema.safeParse({
+    accountId: String(formData.get("accountId") ?? ""),
+    settlementAccountId: String(formData.get("settlementAccountId") ?? ""),
+    statementClosingDay: String(formData.get("statementClosingDay") ?? "1"),
+    paymentDay: String(formData.get("paymentDay") ?? "1"),
+    automaticSettlement: formData.get("automaticSettlement") === "on" || formData.get("automaticSettlement") === "true"
+  });
+
+  if (!parsed.success) {
+    return { ok: false, fieldErrors: toFieldErrors(parsed.error) };
+  }
+
+  try {
+    const { supabase, user } = await requireUser();
+    await saveCreditCardSettings(supabase, user.id, parsed.data);
+    revalidatePath("/accounts");
+    revalidatePath("/");
+    return { ok: true, message: "Configurazione carta salvata" };
+  } catch (error) {
+    return { ok: false, message: messageFromError(error) };
+  }
+}
+
+export async function deleteCreditCardSettingsAction(formData: FormData) {
+  const accountId = String(formData.get("accountId") ?? "");
+  const { supabase, user } = await requireUser();
+  await deleteCreditCardSettings(supabase, user.id, accountId);
+  revalidatePath("/accounts");
+  revalidatePath("/");
 }
 
 export async function saveFundAction(_prevState: FormState, formData: FormData): Promise<FormState> {
