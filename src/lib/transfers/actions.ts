@@ -46,8 +46,9 @@ function formDataToTransferObject(formData: FormData) {
 }
 
 function formDataToTransferObjects(formData: FormData) {
+  const hasRows = formData.has("rowCount");
   const rowCount = Number(formData.get("rowCount") ?? 1);
-  if (!Number.isFinite(rowCount) || rowCount <= 1) {
+  if (!hasRows || !Number.isFinite(rowCount) || rowCount < 1) {
     return [formDataToTransferObject(formData)];
   }
 
@@ -77,7 +78,11 @@ export async function saveTransferAction(_prevState: FormState, formData: FormDa
   const parsed = parsedTransferPayload(formData, transferObjects);
 
   if (!parsed.success) {
-    return { ok: false, fieldErrors: toFieldErrors(parsed.error) };
+    return {
+      ok: false,
+      fieldErrors: toFieldErrors(parsed.error),
+      message: "Controlla i dati del trasferimento"
+    };
   }
 
   try {
@@ -121,7 +126,7 @@ export async function deleteTransferAction(formData: FormData) {
 
 function parsedTransferPayload(formData: FormData, transferObjects: ReturnType<typeof formDataToTransferObjects>) {
   const hasExistingId = Boolean(String(formData.get("id") ?? ""));
-  if (hasExistingId || transferObjects.length === 1) {
+  if (hasExistingId || !formData.has("rowCount")) {
     return transferFormSchema.safeParse(transferObjects[0]);
   }
 
