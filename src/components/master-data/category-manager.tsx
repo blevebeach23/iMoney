@@ -1,11 +1,13 @@
 "use client";
 
 import { useFormState } from "react-dom";
-import { Archive, FolderPlus, ListPlus, Save } from "lucide-react";
+import { Archive, FolderPlus, ListPlus, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   deactivateCategoryAction,
   deactivateMacroCategoryAction,
+  deleteCategoryAction,
+  deleteMacroCategoryAction,
   saveCategoryAction,
   saveMacroCategoryAction
 } from "@/lib/master-data/actions";
@@ -65,7 +67,40 @@ function CategoryForm({
   );
 }
 
+function DeleteCategoryForm({ action, id, label }: Readonly<{ action: typeof deleteCategoryAction | typeof deleteMacroCategoryAction; id: string; label: string }>) {
+  const [state, formAction] = useFormState(action, initialState);
+
+  return (
+    <form
+      action={formAction}
+      onSubmit={(event) => {
+        if (!confirm(`Eliminare definitivamente "${label}"?`)) {
+          event.preventDefault();
+        }
+      }}
+      className="space-y-2"
+    >
+      <FormMessage state={state} />
+      <input type="hidden" name="id" value={id} />
+      <Button type="submit" variant="ghost" className="w-full text-red-700">
+        <Trash2 aria-hidden className="h-4 w-4" />
+        Elimina definitivamente
+      </Button>
+    </form>
+  );
+}
+
+function BlockedDeleteNote({ reasons }: Readonly<{ reasons: string[] }>) {
+  if (reasons.length === 0) {
+    return null;
+  }
+
+  return <p className="text-xs leading-5 text-zinc-500">Eliminazione definitiva bloccata: {reasons.join(", ")}.</p>;
+}
+
 export function CategoryManager({ categoryTree }: Readonly<{ categoryTree: CategoryTreeItem[] }>) {
+  const activeMacroCategories = categoryTree.filter((macro) => macro.deletedAt === null);
+
   return (
     <div className="space-y-4">
       <details className="rounded-md border border-border bg-white p-4" open={categoryTree.length === 0}>
@@ -78,14 +113,14 @@ export function CategoryManager({ categoryTree }: Readonly<{ categoryTree: Categ
         </div>
       </details>
 
-      {categoryTree.length > 0 && (
+      {activeMacroCategories.length > 0 && (
         <details className="rounded-md border border-border bg-white p-4">
           <summary className="flex cursor-pointer list-none items-center gap-2 font-semibold">
             <ListPlus aria-hidden className="h-4 w-4" />
             Nuova categoria
           </summary>
           <div className="mt-4">
-            <CategoryForm macroCategories={categoryTree} defaultMacroCategoryId={categoryTree[0]?.id} />
+            <CategoryForm macroCategories={activeMacroCategories} defaultMacroCategoryId={activeMacroCategories[0]?.id} />
           </div>
         </details>
       )}
@@ -99,7 +134,10 @@ export function CategoryManager({ categoryTree }: Readonly<{ categoryTree: Categ
         categoryTree.map((macro) => (
           <details key={macro.id} className="rounded-md border border-border bg-white p-4" open>
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
-              <span className="font-bold tracking-normal">{macro.name}</span>
+              <span className="font-bold tracking-normal">
+                {macro.name}
+                {macro.deletedAt && <span className="ml-2 text-xs font-semibold text-zinc-500">Disattivata</span>}
+              </span>
               <span className="text-xs font-semibold text-zinc-500">{macro.categories.length}</span>
             </summary>
 
@@ -110,47 +148,96 @@ export function CategoryManager({ categoryTree }: Readonly<{ categoryTree: Categ
                 macro.categories.map((category) => (
                   <div key={category.id} className="rounded-md border border-border p-3">
                     <div className="flex items-center justify-between gap-3">
-                      <p className="font-semibold">{category.name}</p>
+                      <p className="font-semibold">
+                        {category.name}
+                        {category.deletedAt && <span className="ml-2 text-xs font-semibold text-zinc-500">Disattivata</span>}
+                      </p>
                       <span className="text-xs font-medium text-zinc-500">#{category.sortOrder}</span>
                     </div>
-                    <details className="mt-3 rounded-md bg-zinc-50 p-3">
-                      <summary className="cursor-pointer list-none text-sm font-semibold">Modifica o sposta</summary>
-                      <div className="mt-4">
-                        <CategoryForm category={category} macroCategories={categoryTree} />
-                      </div>
-                    </details>
-                    <form action={deactivateCategoryAction} className="mt-3">
-                      <input type="hidden" name="id" value={category.id} />
-                      <Button type="submit" variant="ghost" className="w-full text-red-700">
-                        <Archive aria-hidden className="h-4 w-4" />
-                        Disattiva categoria
-                      </Button>
-                    </form>
+                    {category.deletedAt === null && (
+                      <details className="mt-3 rounded-md bg-zinc-50 p-3">
+                        <summary className="cursor-pointer list-none text-sm font-semibold">Modifica o sposta</summary>
+                        <div className="mt-4">
+                          <CategoryForm category={category} macroCategories={activeMacroCategories} />
+                        </div>
+                      </details>
+                    )}
+                    <div className="mt-3 space-y-2">
+                      {!category.deletion.canDelete && category.deletedAt === null && (
+                        <form action={deactivateCategoryAction}>
+                          <input type="hidden" name="id" value={category.id} />
+                          <Button type="submit" variant="ghost" className="w-full text-red-700">
+                            <Archive aria-hidden className="h-4 w-4" />
+                            Disattiva categoria
+                          </Button>
+                        </form>
+                      )}
+                      {category.deletion.canDelete ? (
+                        <>
+                          {category.deletedAt === null && (
+                            <form action={deactivateCategoryAction}>
+                              <input type="hidden" name="id" value={category.id} />
+                              <Button type="submit" variant="secondary" className="w-full text-red-700">
+                                <Archive aria-hidden className="h-4 w-4" />
+                                Disattiva categoria
+                              </Button>
+                            </form>
+                          )}
+                          <DeleteCategoryForm action={deleteCategoryAction} id={category.id} label={category.name} />
+                        </>
+                      ) : (
+                        <BlockedDeleteNote reasons={category.deletion.reasons} />
+                      )}
+                    </div>
                   </div>
                 ))
               )}
 
-              <details className="rounded-md border border-border p-3">
-                <summary className="cursor-pointer list-none text-sm font-semibold">Aggiungi categoria figlia</summary>
-                <div className="mt-4">
-                  <CategoryForm macroCategories={categoryTree} defaultMacroCategoryId={macro.id} />
-                </div>
-              </details>
+              {macro.deletedAt === null && (
+                <details className="rounded-md border border-border p-3">
+                  <summary className="cursor-pointer list-none text-sm font-semibold">Aggiungi categoria figlia</summary>
+                  <div className="mt-4">
+                    <CategoryForm macroCategories={activeMacroCategories} defaultMacroCategoryId={macro.id} />
+                  </div>
+                </details>
+              )}
 
-              <details className="rounded-md border border-border p-3">
-                <summary className="cursor-pointer list-none text-sm font-semibold">Modifica macro-categoria</summary>
-                <div className="mt-4">
-                  <MacroCategoryForm macro={macro} />
-                </div>
-              </details>
+              {macro.deletedAt === null && (
+                <details className="rounded-md border border-border p-3">
+                  <summary className="cursor-pointer list-none text-sm font-semibold">Modifica macro-categoria</summary>
+                  <div className="mt-4">
+                    <MacroCategoryForm macro={macro} />
+                  </div>
+                </details>
+              )}
 
-              <form action={deactivateMacroCategoryAction}>
-                <input type="hidden" name="id" value={macro.id} />
-                <Button type="submit" variant="secondary" className="w-full text-red-700">
-                  <Archive aria-hidden className="h-4 w-4" />
-                  Disattiva macro-categoria
-                </Button>
-              </form>
+              <div className="space-y-2">
+                {!macro.deletion.canDelete && macro.deletedAt === null && (
+                  <form action={deactivateMacroCategoryAction}>
+                    <input type="hidden" name="id" value={macro.id} />
+                    <Button type="submit" variant="secondary" className="w-full text-red-700">
+                      <Archive aria-hidden className="h-4 w-4" />
+                      Disattiva macro-categoria
+                    </Button>
+                  </form>
+                )}
+                {macro.deletion.canDelete ? (
+                  <>
+                    {macro.deletedAt === null && (
+                      <form action={deactivateMacroCategoryAction}>
+                        <input type="hidden" name="id" value={macro.id} />
+                        <Button type="submit" variant="secondary" className="w-full text-red-700">
+                          <Archive aria-hidden className="h-4 w-4" />
+                          Disattiva macro-categoria
+                        </Button>
+                      </form>
+                    )}
+                    <DeleteCategoryForm action={deleteMacroCategoryAction} id={macro.id} label={macro.name} />
+                  </>
+                ) : (
+                  <BlockedDeleteNote reasons={macro.deletion.reasons} />
+                )}
+              </div>
             </div>
           </details>
         ))

@@ -15,7 +15,7 @@ export default async function CategoriesPage() {
     redirect("/login");
   }
 
-  const categoryTree = await getCategoryTree(supabase, user.id);
+  const categoryTree = await getCategoryTree(supabase, user.id, { includeDeleted: true, includeDeletionInfo: true });
 
   return (
     <main className="mx-auto min-h-dvh max-w-md px-4 pb-24 pt-6">

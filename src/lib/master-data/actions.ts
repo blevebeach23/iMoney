@@ -20,6 +20,8 @@ import {
   createMacroCategory,
   deactivateCategory,
   deactivateMacroCategory,
+  deleteCategoryPermanently,
+  deleteMacroCategoryPermanently,
   updateCategory,
   updateMacroCategory
 } from "@/services/categories/category-service";
@@ -181,6 +183,19 @@ export async function deactivateMacroCategoryAction(formData: FormData) {
   revalidatePath("/settings/categories");
 }
 
+export async function deleteMacroCategoryAction(_prevState: FormState, formData: FormData): Promise<FormState> {
+  const macroCategoryId = String(formData.get("id") ?? "");
+
+  try {
+    const { supabase } = await requireUser();
+    await deleteMacroCategoryPermanently(supabase, macroCategoryId);
+    revalidatePath("/settings/categories");
+    return { ok: true, message: "Macro-categoria eliminata" };
+  } catch (error) {
+    return { ok: false, message: messageFromError(error) };
+  }
+}
+
 export async function saveCategoryAction(_prevState: FormState, formData: FormData): Promise<FormState> {
   const parsed = categoryFormSchema.safeParse(formDataToObject(formData));
 
@@ -207,4 +222,17 @@ export async function deactivateCategoryAction(formData: FormData) {
   const { supabase } = await requireUser();
   await deactivateCategory(supabase, categoryId);
   revalidatePath("/settings/categories");
+}
+
+export async function deleteCategoryAction(_prevState: FormState, formData: FormData): Promise<FormState> {
+  const categoryId = String(formData.get("id") ?? "");
+
+  try {
+    const { supabase } = await requireUser();
+    await deleteCategoryPermanently(supabase, categoryId);
+    revalidatePath("/settings/categories");
+    return { ok: true, message: "Categoria eliminata" };
+  } catch (error) {
+    return { ok: false, message: messageFromError(error) };
+  }
 }
