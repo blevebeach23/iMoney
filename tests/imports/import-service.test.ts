@@ -5,10 +5,12 @@ import {
   buildImportBatchPayload,
   buildImportedMovementPayloads,
   buildUndoImportPatch,
+  buildUndoImportTransferPatch,
   ensureImportOtherMacroCategory,
   getAffectedContainerIds,
   resolveCreatedImportCategories
 } from "@/services/imports/import-service";
+import { buildImportedTransferPayloads } from "@/services/transfers/transfer-service";
 import type { ImportMovementInput } from "@/services/imports/import-service";
 
 const rows: ImportMovementInput[] = [
@@ -74,6 +76,33 @@ describe("import service payloads", () => {
       deleted_at: "2026-08-29T10:00:00.000Z",
       updated_by: "user-1"
     });
+  });
+
+  it("links imported transfers to the same import batch", () => {
+    expect(
+      buildImportedTransferPayloads("user-1", "batch-1", [
+        {
+          amount: "100.00",
+          description: "Giroconto",
+          fromAccountId: "00000000-0000-4000-8000-000000000002",
+          fromFundId: null,
+          householdId: null,
+          occurredOn: "2026-08-15",
+          sharedWithFamily: false,
+          toAccountId: "00000000-0000-4000-8000-000000000005",
+          toFundId: null
+        }
+      ])
+    ).toEqual([
+      expect.objectContaining({
+        owner_user_id: "user-1",
+        from_account_id: "00000000-0000-4000-8000-000000000002",
+        to_account_id: "00000000-0000-4000-8000-000000000005",
+        amount: "100.00",
+        import_batch_id: "batch-1"
+      })
+    ]);
+    expect(buildUndoImportTransferPatch("2026-08-29T10:00:00.000Z")).toEqual({ deleted_at: "2026-08-29T10:00:00.000Z" });
   });
 
   it("collects affected accounts and funds once for balance cache rebuild", () => {

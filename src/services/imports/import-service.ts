@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { normalizeAccountValue } from "@/lib/accounts/matching";
 import { normalizeText } from "@/lib/imports/normalization";
 import { rebuildBalanceCaches } from "@/services/balances/balance-service";
+import { createImportedTransferBatch, type ImportedTransferInput } from "@/services/transfers/transfer-service";
 import type { ImportBatch, MovementType } from "@/types/domain";
 
 type Row = Record<string, unknown>;
@@ -23,7 +25,17 @@ export interface ImportMovementInput {
 export interface ConfirmImportInput {
   filename: string;
   rows: ImportMovementInput[];
+  transfers?: ImportTransferInput[];
+  accountMappings?: Record<string, string>;
   macroCategoryIdForNew?: string;
+}
+
+export type ImportTransferInput = ImportedTransferInput;
+
+export interface ImportAccountMapping {
+  csvValue: string;
+  normalizedValue: string;
+  accountId: string;
 }
 
 export async function getImportBatches(supabase: SupabaseClient, userId: string): Promise<ImportBatch[]> {
@@ -38,15 +50,64 @@ export async function getImportBatches(supabase: SupabaseClient, userId: string)
     throw error;
   }
 
-  return (data ?? []).map(mapImportBatchRow);
+  const batches = (data ?? []).map(mapImportBatchRow);
+  if (batches.length === 0) {
+    return [];
+  }
+
+  const { data: activeMovementRows, error: activeMovementError } = await supabase
+    .from("movements")
+    .select("import_batch_id")
+    .eq("owner_user_id", userId)
+    .in("import_batch_id", batches.map((batch) => batch.id))
+    .is("deleted_at", null);
+
+  if (activeMovementError) {
+    throw activeMovementError;
+  }
+
+  const { data: activeTransferRows, error: activeTransferError } = await supabase
+    .from("transfers")
+    .select("import_batch_id")
+    .eq("owner_user_id", userId)
+    .in("import_batch_id", batches.map((batch) => batch.id))
+    .is("deleted_at", null);
+
+  if (activeTransferError) {
+    throw activeTransferError;
+  }
+
+  const activeBatchIds = new Set([
+    ...(activeMovementRows ?? []).map((row: Row) => String(row.import_batch_id)),
+    ...(activeTransferRows ?? []).map((row: Row) => String(row.import_batch_id))
+  ]);
+  return batches.filter((batch) => activeBatchIds.has(batch.id));
+}
+
+export async function getImportAccountMappings(supabase: SupabaseClient, userId: string): Promise<ImportAccountMapping[]> {
+  const { data, error } = await supabase
+    .from("import_account_mappings")
+    .select("csv_value, normalized_value, account_id")
+    .eq("owner_user_id", userId);
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).map((row: Row) => ({
+    accountId: row.account_id ? `account:${String(row.account_id)}` : `fund:${String(row.fund_id)}`,
+    csvValue: String(row.csv_value),
+    normalizedValue: String(row.normalized_value)
+  }));
 }
 
 export async function confirmMovementImport(supabase: SupabaseClient, userId: string, input: ConfirmImportInput): Promise<ImportBatch> {
   const rows = await resolveCreatedImportCategories(supabase, userId, input.rows, input.macroCategoryIdForNew);
+  const transfers = input.transfers ?? [];
 
   const { data: batch, error: batchError } = await supabase
     .from("import_batches")
-    .insert(buildImportBatchPayload(userId, input.filename, rows.length))
+    .insert(buildImportBatchPayload(userId, input.filename, rows.length + transfers.length))
     .select("*")
     .single();
 
@@ -62,6 +123,11 @@ export async function confirmMovementImport(supabase: SupabaseClient, userId: st
     }
   }
 
+  if (transfers.length > 0) {
+    await createImportedTransferBatch(supabase, userId, String(batch.id), transfers);
+  }
+
+  await saveImportAccountMappings(supabase, userId, input.accountMappings ?? {});
   await rebuildBalanceCaches(supabase, userId);
 
   return mapImportBatchRow(batch);
@@ -88,6 +154,17 @@ export async function undoImportBatch(supabase: SupabaseClient, userId: string, 
 
   if (error) {
     throw error;
+  }
+
+  const { error: transferError } = await supabase
+    .from("transfers")
+    .update(buildUndoImportTransferPatch())
+    .eq("owner_user_id", userId)
+    .eq("import_batch_id", batchId)
+    .is("deleted_at", null);
+
+  if (transferError) {
+    throw transferError;
   }
 
   await rebuildBalanceCaches(supabase, userId);
@@ -125,6 +202,12 @@ export function buildUndoImportPatch(userId: string, deletedAt = new Date().toIS
   return {
     deleted_at: deletedAt,
     updated_by: userId
+  };
+}
+
+export function buildUndoImportTransferPatch(deletedAt = new Date().toISOString()) {
+  return {
+    deleted_at: deletedAt
   };
 }
 
@@ -242,6 +325,28 @@ async function getCategoryIdsByNormalizedName(supabase: SupabaseClient, macroCat
   }
 
   return new Map((data ?? []).map((row: Row) => [normalizeText(String(row.name ?? "")), String(row.id)]));
+}
+
+async function saveImportAccountMappings(supabase: SupabaseClient, userId: string, mappings: Record<string, string>) {
+  const rows = Object.entries(mappings)
+    .map(([rawValue, accountId]) => ({
+      owner_user_id: userId,
+      csv_value: rawValue,
+      normalized_value: normalizeAccountValue(rawValue),
+      account_id: accountId.startsWith("account:") ? accountId.slice("account:".length) : null,
+      fund_id: accountId.startsWith("fund:") ? accountId.slice("fund:".length) : null
+    }))
+    .filter((row) => row.normalized_value && row.account_id);
+
+  if (rows.length === 0) {
+    return;
+  }
+
+  const { error } = await supabase.from("import_account_mappings").upsert(rows, { onConflict: "owner_user_id,normalized_value" });
+
+  if (error) {
+    throw error;
+  }
 }
 
 function mapImportBatchRow(row: Row): ImportBatch {

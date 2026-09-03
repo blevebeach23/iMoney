@@ -31,6 +31,26 @@ const accounts: Account[] = [
     cachedBalance: "0.00",
     cachedAt: null,
     deletedAt: null
+  },
+  {
+    id: "account-card",
+    ownerUserId: "user-1",
+    name: "Visa",
+    type: "credit_card",
+    openingBalance: "0.00",
+    cachedBalance: "0.00",
+    cachedAt: null,
+    deletedAt: null
+  },
+  {
+    id: "account-cash",
+    ownerUserId: "user-1",
+    name: "Portafoglio",
+    type: "cash",
+    openingBalance: "0.00",
+    cachedBalance: "0.00",
+    cachedAt: null,
+    deletedAt: null
   }
 ];
 
@@ -137,6 +157,181 @@ describe("CSV import parsing", () => {
       categoryId: "category-food",
       accountId: "account-bank"
     });
+  });
+
+  it("recognizes account labels and common aliases as real account ids", () => {
+    const parsed = parseCsv("Data;Descrizione;Importo;Categoria;Conto\n15/08/2026;Supermercato;-12,50;Spesa;Carta di credito Visa\n16/08/2026;Bar;-3,00;Spesa;Cash");
+    const preview = buildImportPreview({
+      rows: csvRowsToObjects(parsed),
+      mapping: {
+        columns: {
+          date: "Data",
+          description: "Descrizione",
+          amount: "Importo",
+          category: "Categoria",
+          container: "Conto"
+        },
+        defaults: {
+          categoryId: "category-other",
+          containerId: "account:account-bank",
+          type: "expense",
+          sharedWithFamily: false,
+          householdId: null,
+          notes: ""
+        },
+        missingCategoryStrategy: "default"
+      },
+      categories,
+      accounts,
+      funds,
+      existingMovements: []
+    });
+
+    expect(preview.accountMappingRequests).toEqual([]);
+    expect(preview.rows.map((row) => row.movement?.accountId)).toEqual(["account-card", "account-cash"]);
+  });
+
+  it("requires manual account mapping for ambiguous CSV account aliases and reuses it", () => {
+    const parsed = parseCsv("Data;Descrizione;Importo;Categoria;Conto\n15/08/2026;Prelievo;-50,00;Spesa;CC");
+    const base = {
+      rows: csvRowsToObjects(parsed),
+      categories,
+      accounts: [
+        ...accounts,
+        {
+          ...accounts[0],
+          id: "account-bank-2",
+          name: "Secondario"
+        }
+      ],
+      funds,
+      existingMovements: []
+    };
+    const mapping = {
+      columns: { date: "Data", description: "Descrizione", amount: "Importo", category: "Categoria", container: "Conto" },
+      defaults: {
+        categoryId: "category-other",
+        containerId: "account:account-bank",
+        type: "expense" as const,
+        sharedWithFamily: false,
+        householdId: null,
+        notes: ""
+      },
+      missingCategoryStrategy: "default" as const
+    };
+
+    const unresolved = buildImportPreview({ ...base, mapping });
+    const resolved = buildImportPreview({ ...base, mapping: { ...mapping, accountMappings: { cc: "account-bank-2" } } });
+
+    expect(unresolved.accountMappingRequests).toEqual([{ normalizedValue: "cc", rawValue: "CC", reason: "ambiguous" }]);
+    expect(unresolved.rows[0]?.valid).toBe(false);
+    expect(resolved.accountMappingRequests).toEqual([]);
+    expect(resolved.rows[0]?.movement?.accountId).toBe("account-bank-2");
+  });
+
+  it("imports transfer type rows using conto as source and destinazione as destination", () => {
+    const parsed = parseCsv("Data;Descrizione;Importo;tipo;conto;destinazione;categoria\n15/08/2026;Giroconto;100,00;trasferimento;Conto corrente;Carta Visa;");
+    const preview = buildImportPreview({
+      rows: csvRowsToObjects(parsed),
+      mapping: {
+        columns: {
+          date: "Data",
+          description: "Descrizione",
+          amount: "Importo",
+          type: "tipo",
+          container: "conto",
+          destinationAccount: "destinazione",
+          category: "categoria"
+        },
+        defaults: {
+          categoryId: "category-other",
+          containerId: "account:account-bank",
+          type: "expense",
+          sharedWithFamily: false,
+          householdId: null,
+          notes: ""
+        },
+        missingCategoryStrategy: "default"
+      },
+      categories,
+      accounts,
+      funds,
+      existingMovements: []
+    });
+
+    expect(preview.validRows).toBe(1);
+    expect(preview.rows[0]?.movement).toBeNull();
+    expect(preview.rows[0]?.transfer).toMatchObject({
+      fromAccountId: "account-bank",
+      fromFundId: null,
+      toAccountId: "account-card",
+      toFundId: null,
+      amount: "100.00"
+    });
+  });
+
+  it("supports funds in transfer source and destination mapping", () => {
+    const parsed = parseCsv("Data;Descrizione;Importo;tipo;conto;destinazione\n15/08/2026;Accantono;100,00;trasferimento;Cash;Fondo Vacanze\n16/08/2026;Rientro;20,00;trasferimento;Fondo Vacanze;Conto corrente");
+    const preview = buildImportPreview({
+      rows: csvRowsToObjects(parsed),
+      mapping: {
+        columns: {
+          date: "Data",
+          description: "Descrizione",
+          amount: "Importo",
+          type: "tipo",
+          container: "conto",
+          destinationAccount: "destinazione"
+        },
+        defaults: {
+          categoryId: "category-other",
+          containerId: "account:account-bank",
+          type: "expense",
+          sharedWithFamily: false,
+          householdId: null,
+          notes: ""
+        },
+        missingCategoryStrategy: "default"
+      },
+      categories,
+      accounts,
+      funds,
+      existingMovements: []
+    });
+
+    expect(preview.rows[0]?.transfer).toMatchObject({ fromAccountId: "account-cash", fromFundId: null, toAccountId: null, toFundId: "fund-holiday" });
+    expect(preview.rows[1]?.transfer).toMatchObject({ fromAccountId: null, fromFundId: "fund-holiday", toAccountId: "account-bank", toFundId: null });
+  });
+
+  it("keeps simple compatibility with legacy source and destination account columns", () => {
+    const parsed = parseCsv("Data;Descrizione;Importo;conto_origine;conto_destinazione\n15/08/2026;Giroconto;100,00;Conto corrente;Carta Visa");
+    const preview = buildImportPreview({
+      rows: csvRowsToObjects(parsed),
+      mapping: {
+        columns: {
+          date: "Data",
+          description: "Descrizione",
+          amount: "Importo",
+          sourceAccount: "conto_origine",
+          destinationAccount: "conto_destinazione"
+        },
+        defaults: {
+          categoryId: "category-other",
+          containerId: "account:account-bank",
+          type: "expense",
+          sharedWithFamily: false,
+          householdId: null,
+          notes: ""
+        },
+        missingCategoryStrategy: "default"
+      },
+      categories,
+      accounts,
+      funds,
+      existingMovements: []
+    });
+
+    expect(preview.rows[0]?.transfer).toMatchObject({ fromAccountId: "account-bank", toAccountId: "account-card" });
   });
 
   it("keeps mapping by header name and not by column position", () => {

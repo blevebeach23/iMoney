@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { confirmImportAction, undoImportBatchAction } from "@/lib/imports/actions";
 import { csvRowsToObjects, parseCsv } from "@/lib/imports/csv";
-import { buildImportPreview, inferInitialColumns, type ImportColumnKey, type ImportMapping, type ImportPreview } from "@/lib/imports/mapping";
+import { buildImportPreview, inferInitialColumns, type AccountMappingRequest, type ImportColumnKey, type ImportMapping, type ImportPreview } from "@/lib/imports/mapping";
 import { accountOptionLabel } from "@/lib/accounts/labels";
 import type { ActiveHouseholdOption } from "@/services/households/household-service";
 import type { CategoryTreeItem } from "@/services/categories/category-service";
@@ -18,6 +18,7 @@ const fields: Array<{ key: ImportColumnKey; label: string }> = [
   { key: "type", label: "Tipo" },
   { key: "category", label: "Categoria" },
   { key: "container", label: "Conto/Fondo" },
+  { key: "destinationAccount", label: "Destinazione" },
   { key: "reimbursement", label: "Rimborso" },
   { key: "shared", label: "Condivisione famiglia" },
   { key: "notes", label: "Note" }
@@ -36,6 +37,7 @@ function containerOptions(accounts: Account[], funds: Fund[]) {
 
 export function ImportWorkflow({
   accounts,
+  accountMappings,
   batches,
   categoryTree,
   existingMovements,
@@ -43,6 +45,7 @@ export function ImportWorkflow({
   households
 }: Readonly<{
   accounts: Account[];
+  accountMappings: Record<string, string>;
   batches: ImportBatch[];
   categoryTree: CategoryTreeItem[];
   existingMovements: Movement[];
@@ -58,6 +61,7 @@ export function ImportWorkflow({
   const [defaultContainerId, setDefaultContainerId] = useState(containerOptions(accounts, funds)[0]?.value ?? "");
   const [missingCategoryStrategy, setMissingCategoryStrategy] = useState<ImportMapping["missingCategoryStrategy"]>("create");
   const [allowDuplicates, setAllowDuplicates] = useState(false);
+  const [manualAccountMappings, setManualAccountMappings] = useState<Record<string, string>>({});
   const defaultHousehold = households[0];
   const categories = useMemo(() => flattenCategories(categoryTree), [categoryTree]);
   const containers = useMemo(() => containerOptions(accounts, funds), [accounts, funds]);
@@ -73,9 +77,10 @@ export function ImportWorkflow({
         householdId: defaultHousehold?.id ?? null,
         notes: ""
       },
+      accountMappings: { ...accountMappings, ...manualAccountMappings },
       missingCategoryStrategy
     }),
-    [columns, defaultCategoryId, defaultContainerId, defaultHousehold?.id, defaultHousehold?.shareByDefault, missingCategoryStrategy]
+    [accountMappings, columns, defaultCategoryId, defaultContainerId, defaultHousehold?.id, defaultHousehold?.shareByDefault, manualAccountMappings, missingCategoryStrategy]
   );
   const previewResult: { preview: ImportPreview | null; error: string | null } = useMemo(() => {
     if (rows.length === 0 || parseErrors.length > 0) {
@@ -92,8 +97,11 @@ export function ImportWorkflow({
     [accounts, categories, existingMovements, funds, mapping, parseErrors.length, rows]
   );
   const preview = previewResult.preview;
+  const accountMappingRequests = preview?.accountMappingRequests ?? [];
+  const unresolvedAccountMappings = accountMappingRequests.filter((request) => !manualAccountMappings[request.normalizedValue]);
   const rowsToImport = preview?.rows.filter((row) => row.valid && row.movement && (allowDuplicates || !row.duplicateCandidate)).map((row) => row.movement) ?? [];
-  const canImport = rowsToImport.length > 0 && Boolean(defaultCategoryId) && Boolean(defaultContainerId);
+  const transfersToImport = preview?.rows.filter((row) => row.valid && row.transfer).map((row) => row.transfer) ?? [];
+  const canImport = rowsToImport.length + transfersToImport.length > 0 && (rowsToImport.length === 0 || (Boolean(defaultCategoryId) && Boolean(defaultContainerId))) && unresolvedAccountMappings.length === 0;
 
   async function handleFile(file: File | null) {
     if (!file) {
@@ -163,6 +171,22 @@ export function ImportWorkflow({
         </section>
       )}
 
+      {accountMappingRequests.length > 0 && (
+        <section className="space-y-4 rounded-md border border-border bg-white p-4 shadow-panel">
+          <h2 className="text-lg font-semibold text-foreground">Mapping conti CSV</h2>
+          {accountMappingRequests.map((request) => (
+            <AccountMappingSelect
+              key={request.normalizedValue}
+              accounts={accounts}
+              funds={funds}
+              request={request}
+              value={manualAccountMappings[request.normalizedValue] ?? ""}
+              onChange={(accountId) => setManualAccountMappings((current) => ({ ...current, [request.normalizedValue]: accountId }))}
+            />
+          ))}
+        </section>
+      )}
+
       {headers.length > 0 && (
         <section className="space-y-4 rounded-md border border-border bg-white p-4 shadow-panel">
           <h2 className="text-lg font-semibold text-foreground">Default e categorie</h2>
@@ -201,10 +225,10 @@ export function ImportWorkflow({
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-zinc-500">Riga {row.rowNumber}</p>
-                    <h3 className="mt-1 font-bold">{row.movement?.description ?? "Non importabile"}</h3>
-                    <p className="mt-1 text-sm text-zinc-600">{row.movement?.categoryName ?? row.errors.join(", ")}</p>
+                    <h3 className="mt-1 font-bold">{row.movement?.description ?? row.transfer?.description ?? "Non importabile"}</h3>
+                    <p className="mt-1 text-sm text-zinc-600">{row.transfer ? "Trasferimento" : row.movement?.categoryName ?? row.errors.join(", ")}</p>
                   </div>
-                  <p className="font-bold tabular-nums">EUR {row.movement?.amount ?? "-"}</p>
+                  <p className="font-bold tabular-nums">EUR {row.movement?.amount ?? row.transfer?.amount ?? "-"}</p>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
                   {row.duplicateCandidate && <span className="rounded-md bg-amber-50 px-2 py-1 text-amber-700">Possibile duplicato</span>}
@@ -216,7 +240,16 @@ export function ImportWorkflow({
             ))}
           </div>
           <form action={confirmImportAction}>
-            <input type="hidden" name="payload" value={JSON.stringify({ filename, rows: rowsToImport })} />
+            <input
+              type="hidden"
+              name="payload"
+              value={JSON.stringify({
+                filename,
+                rows: rowsToImport,
+                transfers: transfersToImport,
+                accountMappings: buildMappingsToPersist(accountMappingRequests, manualAccountMappings)
+              })}
+            />
             <Button type="submit" disabled={!canImport} className="w-full">
               <Upload aria-hidden className="h-4 w-4" />
               Conferma import
@@ -240,7 +273,15 @@ export function ImportWorkflow({
             <article key={batch.id} className="rounded-md border border-border bg-white p-4 shadow-panel">
               <p className="font-semibold">{batch.sourceFilename}</p>
               <p className="mt-1 text-sm text-zinc-600">{batch.importedRows} righe importate</p>
-              <form action={undoImportBatchAction} className="mt-3">
+              <form
+                action={undoImportBatchAction}
+                className="mt-3"
+                onSubmit={(event) => {
+                  if (!window.confirm(`Annullare l'import "${batch.sourceFilename}"? I movimenti importati verranno eliminati.`)) {
+                    event.preventDefault();
+                  }
+                }}
+              >
                 <input type="hidden" name="batchId" value={batch.id} />
                 <Button type="submit" variant="secondary" className="w-full">
                   <RotateCcw aria-hidden className="h-4 w-4" />
@@ -253,6 +294,39 @@ export function ImportWorkflow({
       </section>
     </div>
   );
+}
+
+function AccountMappingSelect({
+  accounts,
+  funds,
+  onChange,
+  request,
+  value
+}: Readonly<{
+  accounts: Account[];
+  funds: Fund[];
+  onChange: (value: string) => void;
+  request: AccountMappingRequest;
+  value: string;
+}>) {
+  const options = containerOptions(accounts, funds);
+
+  return (
+    <label className="block">
+      <span className="text-sm font-semibold text-foreground">{request.rawValue}</span>
+      <span className="ml-2 text-xs font-semibold text-amber-700">{request.reason === "ambiguous" ? "ambiguo" : "non trovato"}</span>
+      <select value={value} onChange={(event) => onChange(event.target.value)} className="mt-2 h-11 w-full rounded-md border border-border bg-white px-3">
+        <option value="">Seleziona conto o fondo esistente</option>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>{option.label}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function buildMappingsToPersist(requests: AccountMappingRequest[], mappings: Record<string, string>) {
+  return Object.fromEntries(requests.filter((request) => mappings[request.normalizedValue]).map((request) => [request.rawValue, mappings[request.normalizedValue]]));
 }
 
 function Select({

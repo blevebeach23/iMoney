@@ -15,6 +15,18 @@ export interface TransferFilters {
   shared?: "all" | "yes" | "no";
 }
 
+export interface ImportedTransferInput {
+  occurredOn: string;
+  description: string;
+  amount: string;
+  fromAccountId: string | null;
+  fromFundId: string | null;
+  toAccountId: string | null;
+  toFundId: string | null;
+  sharedWithFamily: boolean;
+  householdId: string | null;
+}
+
 export async function getTransfersUntil(supabase: SupabaseClient, userId: string, cutoffDate: string): Promise<Transfer[]> {
   const { data, error } = await supabase
     .from("transfers")
@@ -157,6 +169,20 @@ export async function createTransferBatch(supabase: SupabaseClient, userId: stri
   return (data ?? []).map((row: TransferRow) => String(row.id));
 }
 
+export async function createImportedTransferBatch(supabase: SupabaseClient, userId: string, batchId: string, inputs: ImportedTransferInput[]) {
+  if (inputs.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await supabase.from("transfers").insert(buildImportedTransferPayloads(userId, batchId, inputs)).select("id");
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).map((row: TransferRow) => String(row.id));
+}
+
 export async function updateTransfer(supabase: SupabaseClient, userId: string, input: TransferFormInput & { id: string }) {
   const existing = await getTransferById(supabase, userId, input.id);
   if (existing?.recurringTransferId) {
@@ -241,6 +267,22 @@ function toTransferPayload(userId: string, input: TransferFormInput) {
   };
 }
 
+export function buildImportedTransferPayloads(userId: string, batchId: string, rows: ImportedTransferInput[]) {
+  return rows.map((row) => ({
+    owner_user_id: userId,
+    household_id: row.sharedWithFamily ? row.householdId : null,
+    shared_with_family: row.sharedWithFamily,
+    from_account_id: row.fromAccountId,
+    to_account_id: row.toAccountId,
+    from_fund_id: row.fromFundId,
+    to_fund_id: row.toFundId,
+    amount: row.amount,
+    occurred_on: row.occurredOn,
+    description: row.description,
+    import_batch_id: batchId
+  }));
+}
+
 function mapTransferListRow(row: TransferRow): TransferListItem {
   const fromAccount = asRecord(row.from_account);
   const toAccount = asRecord(row.to_account);
@@ -272,6 +314,7 @@ function mapTransferRow(row: TransferRow): Transfer {
     creditCardAccountId: row.credit_card_account_id ? String(row.credit_card_account_id) : null,
     creditCardCycleStartOn: row.credit_card_cycle_start_on ? String(row.credit_card_cycle_start_on) : null,
     creditCardCycleEndOn: row.credit_card_cycle_end_on ? String(row.credit_card_cycle_end_on) : null,
+    importBatchId: row.import_batch_id ? String(row.import_batch_id) : null,
     recurringTransferId: row.recurring_transfer_id ? String(row.recurring_transfer_id) : null
   };
 }

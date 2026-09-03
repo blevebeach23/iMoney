@@ -170,6 +170,7 @@ export interface Transfer {
   creditCardAccountId?: string | null;
   creditCardCycleStartOn?: string | null;
   creditCardCycleEndOn?: string | null;
+  importBatchId?: string | null;
   recurringTransferId?: string | null;
 }
 

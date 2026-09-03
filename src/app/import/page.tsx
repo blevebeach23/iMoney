@@ -5,7 +5,7 @@ import { getAccounts } from "@/services/accounts/account-service";
 import { getCategoryTree } from "@/services/categories/category-service";
 import { getFunds } from "@/services/funds/fund-service";
 import { getActiveHouseholdOptions } from "@/services/households/household-service";
-import { getImportBatches } from "@/services/imports/import-service";
+import { getImportAccountMappings, getImportBatches } from "@/services/imports/import-service";
 import { getMovements } from "@/services/movements/movement-service";
 
 export const dynamic = "force-dynamic";
@@ -20,8 +20,9 @@ export default async function ImportPage() {
     redirect("/login");
   }
 
-  const [accounts, batches, categoryTree, existingMovements, funds, households] = await Promise.all([
+  const [accounts, accountMappings, batches, categoryTree, existingMovements, funds, households] = await Promise.all([
     getAccounts(supabase, user.id),
+    getImportAccountMappings(supabase, user.id),
     getImportBatches(supabase, user.id),
     getCategoryTree(supabase, user.id),
     getMovements(supabase, user.id),
@@ -37,6 +38,7 @@ export default async function ImportPage() {
       </header>
       <ImportWorkflow
         accounts={accounts}
+        accountMappings={Object.fromEntries(accountMappings.map((mapping) => [mapping.normalizedValue, mapping.accountId]))}
         batches={batches}
         categoryTree={categoryTree}
         existingMovements={existingMovements}
