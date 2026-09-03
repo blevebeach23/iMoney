@@ -59,8 +59,9 @@ function formDataToMovementObject(formData: FormData) {
 }
 
 function formDataToMovementObjects(formData: FormData) {
+  const hasRows = formData.has("rowCount");
   const rowCount = Number(formData.get("rowCount") ?? 1);
-  if (!Number.isFinite(rowCount) || rowCount <= 1) {
+  if (!hasRows || !Number.isFinite(rowCount) || rowCount < 1) {
     return [formDataToMovementObject(formData)];
   }
 
@@ -174,7 +175,11 @@ export async function saveMovementAction(_prevState: FormState, formData: FormDa
   const parsed = parsedMovementPayload(formData, movementObjects);
 
   if (!parsed.success) {
-    return { ok: false, fieldErrors: toFieldErrors(parsed.error) };
+    return {
+      ok: false,
+      fieldErrors: toFieldErrors(parsed.error),
+      message: "Controlla i dati del movimento"
+    };
   }
 
   try {
@@ -365,7 +370,7 @@ export async function bulkUpdateTimelineAction(formData: FormData) {
 
 function parsedMovementPayload(formData: FormData, movementObjects: ReturnType<typeof formDataToMovementObjects>) {
   const hasExistingId = Boolean(String(formData.get("id") ?? ""));
-  if (hasExistingId || movementObjects.length === 1) {
+  if (hasExistingId || !formData.has("rowCount")) {
     return movementFormSchema.safeParse(movementObjects[0]);
   }
 
