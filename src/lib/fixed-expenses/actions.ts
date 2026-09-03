@@ -6,10 +6,13 @@ import { toFieldErrors, type FormState } from "@/lib/auth/validation";
 import { currentMonthRange } from "@/lib/calculations/dates";
 import { fixedExpenseFormSchema, fixedExpenseRequestDecisionSchema, fixedExpenseRequestFormSchema, parseFixedExpenseContainerId } from "@/lib/fixed-expenses/validation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { rebuildBalanceCaches } from "@/services/balances/balance-service";
 import {
   createFixedExpense,
   deactivateFixedExpense,
   generateFixedExpenseMovements,
+  softDeleteFutureFixedExpenseMovements,
+  syncFixedExpenseFutureMovements,
   updateFixedExpense
 } from "@/services/fixed-expenses/fixed-expense-service";
 import {
@@ -140,7 +143,8 @@ export async function saveFixedExpenseAction(_prevState: FormState, formData: Fo
       fixedExpenseId = await createFixedExpense(supabase, user.id, parsed.data);
     }
     const range = currentMonthRange();
-    await generateFixedExpenseMovements(supabase, user.id, String(fixedExpenseId), range.monthStart, monthStartAfter(range.monthStart, 11));
+    await syncFixedExpenseFutureMovements(supabase, user.id, String(fixedExpenseId), range.monthStart, monthStartAfter(range.monthStart, 11));
+    await rebuildBalanceCaches(supabase, user.id);
   } catch (error) {
     return { ok: false, message: messageFromError(error) };
   }
@@ -219,6 +223,8 @@ export async function deactivateFixedExpenseAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const { supabase, user } = await requireUser();
   await deactivateFixedExpense(supabase, user.id, id);
+  await softDeleteFutureFixedExpenseMovements(supabase, user.id, id);
+  await rebuildBalanceCaches(supabase, user.id);
   revalidatePath("/fixed-expenses");
 }
 
@@ -228,6 +234,7 @@ export async function generateFixedExpenseMovementsAction(formData: FormData) {
   const toMonthStart = String(formData.get("toMonthStart") ?? "");
   const { supabase, user } = await requireUser();
   await generateFixedExpenseMovements(supabase, user.id, id, fromMonthStart, toMonthStart);
+  await rebuildBalanceCaches(supabase, user.id);
   revalidatePath("/fixed-expenses");
   revalidatePath("/movements");
   revalidatePath("/");

@@ -14,7 +14,7 @@ import { getSharedHouseholdFunds } from "@/services/funds/fund-service";
 import { getMovementCategoryInfo, getSharedHouseholdMovements, getSharedHouseholdMovementsBetween } from "@/services/movements/movement-service";
 import { getActiveHouseholds, getHouseholdById } from "@/services/households/household-service";
 import { getMovementRequestsForHousehold } from "@/services/movements/movement-request-service";
-import { buildMovementTimeline } from "@/services/timeline/timeline-service";
+import { buildMovementTimeline, filterTimelineFutureItems } from "@/services/timeline/timeline-service";
 import { getSharedHouseholdTransfers } from "@/services/transfers/transfer-service";
 
 export const dynamic = "force-dynamic";
@@ -55,6 +55,7 @@ export default async function FamilyPage({ searchParams }: Readonly<{ searchPara
   }
 
   const selectedMonth = firstParam(searchParams.month) ?? formatYearMonth(new Date());
+  const showFuture = firstParam(searchParams.showFuture) === "1";
   const range = monthRangeFromYearMonth(selectedMonth);
   const year = Number(range.yearMonth.slice(0, 4));
   const [household, monthMovements, yearMovements, monthTransfers, budgets, categoryInfo, sharedFunds, movementRequests, fixedExpenseRequests] = await Promise.all([
@@ -79,7 +80,7 @@ export default async function FamilyPage({ searchParams }: Readonly<{ searchPara
   const aggregates = calculateCategoryAggregates(visibleMonthMovements, categoryInfo);
   const budgetReport = calculateBudgetReport(budgets, visibleMonthMovements, categoryInfo);
   const annualTrend = calculateAnnualTrend(visibleYearMovements, year);
-  const familyTimeline = buildMovementTimeline(visibleMonthMovements, monthTransfers);
+  const familyTimeline = filterTimelineFutureItems(buildMovementTimeline(visibleMonthMovements, monthTransfers), showFuture);
 
   return (
     <FamilyDashboard
@@ -96,6 +97,7 @@ export default async function FamilyPage({ searchParams }: Readonly<{ searchPara
       sharedFunds={sharedFunds}
       summary={summary}
       timeline={familyTimeline}
+      showFuture={showFuture}
     />
   );
 }

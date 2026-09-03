@@ -24,6 +24,7 @@ import {
   updateMacroCategory
 } from "@/services/categories/category-service";
 import { createFund, deactivateFund, updateFund } from "@/services/funds/fund-service";
+import { rebuildBalanceCaches } from "@/services/balances/balance-service";
 import { deleteCreditCardSettings, saveCreditCardSettings } from "@/services/credit-cards/credit-card-service";
 import { notifySharedFund } from "@/services/notifications/notification-service";
 import { toFieldErrors, type FormState } from "@/lib/auth/validation";
@@ -68,6 +69,7 @@ export async function saveAccountAction(_prevState: FormState, formData: FormDat
     } else {
       await createAccount(supabase, user.id, parsed.data);
     }
+    await rebuildBalanceCaches(supabase, user.id);
     revalidatePath("/accounts");
     return { ok: true, message: "Conto salvato" };
   } catch (error) {
@@ -79,6 +81,7 @@ export async function deactivateAccountAction(formData: FormData) {
   const accountId = String(formData.get("id") ?? "");
   const { supabase, user } = await requireUser();
   await deactivateAccount(supabase, user.id, accountId);
+  await rebuildBalanceCaches(supabase, user.id);
   revalidatePath("/accounts");
 }
 
@@ -132,6 +135,7 @@ export async function saveFundAction(_prevState: FormState, formData: FormData):
         await notifySharedFund(supabase, fund, "created", user.id);
       }
     }
+    await rebuildBalanceCaches(supabase, user.id);
     revalidatePath("/funds");
     revalidatePath("/family");
     return { ok: true, message: "Fondo salvato" };
@@ -144,6 +148,7 @@ export async function deactivateFundAction(formData: FormData) {
   const fundId = String(formData.get("id") ?? "");
   const { supabase, user } = await requireUser();
   await deactivateFund(supabase, user.id, fundId);
+  await rebuildBalanceCaches(supabase, user.id);
   revalidatePath("/funds");
   revalidatePath("/family");
 }

@@ -66,6 +66,94 @@ export async function updateFixedExpense(supabase: SupabaseClient, userId: strin
   }
 }
 
+export async function syncFixedExpenseFutureMovements(
+  supabase: SupabaseClient,
+  userId: string,
+  fixedExpenseId: string,
+  fromMonthStart: string,
+  toMonthStart: string,
+  today = new Date().toISOString().slice(0, 10)
+): Promise<number> {
+  const rule = await getFixedExpenseById(supabase, userId, fixedExpenseId);
+
+  if (!rule) {
+    throw new Error("Spesa ricorrente non trovata");
+  }
+
+  const expected = buildFixedExpenseOccurrences(rule, fromMonthStart, toMonthStart).filter((occurrence) => occurrence.occurredOn >= today);
+  const expectedByDate = new Map(expected.map((occurrence) => [occurrence.occurredOn, occurrence]));
+  const { data: existingRows, error: existingError } = await supabase
+    .from("movements")
+    .select("id, occurred_on")
+    .eq("fixed_expense_id", fixedExpenseId)
+    .eq("owner_user_id", userId)
+    .is("deleted_at", null)
+    .gte("occurred_on", today);
+
+  if (existingError) {
+    throw existingError;
+  }
+
+  let changed = 0;
+  const existingByDate = new Map((existingRows ?? []).map((row: Row) => [String(row.occurred_on), String(row.id)]));
+  const deletedAt = new Date().toISOString();
+  const obsoleteIds = (existingRows ?? [])
+    .filter((row: Row) => !expectedByDate.has(String(row.occurred_on)))
+    .map((row: Row) => String(row.id));
+
+  if (obsoleteIds.length > 0) {
+    const { error } = await supabase
+      .from("movements")
+      .update({ deleted_at: deletedAt, updated_by: userId })
+      .in("id", obsoleteIds)
+      .eq("owner_user_id", userId);
+
+    if (error) {
+      throw error;
+    }
+    changed += obsoleteIds.length;
+  }
+
+  for (const [occurredOn, movementId] of existingByDate) {
+    if (!expectedByDate.has(occurredOn)) {
+      continue;
+    }
+
+    const { error } = await supabase
+      .from("movements")
+      .update({
+        household_id: rule.isSharedWithHousehold ? rule.householdId : null,
+        account_id: rule.accountId,
+        fund_id: rule.fundId,
+        category_id: rule.categoryId,
+        type: "expense",
+        amount: rule.amount,
+        occurred_on: occurredOn,
+        description: rule.description,
+        shared_with_family: rule.isSharedWithHousehold,
+        reimbursement_for_movement_id: null,
+        notes: "",
+        updated_by: userId
+      })
+      .eq("id", movementId)
+      .eq("owner_user_id", userId)
+      .is("deleted_at", null);
+
+    if (error) {
+      throw error;
+    }
+    changed += 1;
+  }
+
+  const missing = expected.filter((occurrence) => !existingByDate.has(occurrence.occurredOn));
+  if (missing.length > 0) {
+    const inserted = await insertFixedExpenseMovements(supabase, userId, rule, missing);
+    changed += inserted;
+  }
+
+  return changed;
+}
+
 export async function deactivateFixedExpense(supabase: SupabaseClient, userId: string, fixedExpenseId: string) {
   const { error } = await supabase
     .from("fixed_expenses")
@@ -77,6 +165,42 @@ export async function deactivateFixedExpense(supabase: SupabaseClient, userId: s
   if (error) {
     throw error;
   }
+}
+
+export async function softDeleteFutureFixedExpenseMovements(
+  supabase: SupabaseClient,
+  userId: string,
+  fixedExpenseId: string,
+  today = new Date().toISOString().slice(0, 10)
+): Promise<number> {
+  const { data, error: readError } = await supabase
+    .from("movements")
+    .select("id")
+    .eq("fixed_expense_id", fixedExpenseId)
+    .eq("owner_user_id", userId)
+    .is("deleted_at", null)
+    .gte("occurred_on", today);
+
+  if (readError) {
+    throw readError;
+  }
+
+  const ids = (data ?? []).map((row: Row) => String(row.id));
+  if (ids.length === 0) {
+    return 0;
+  }
+
+  const { error } = await supabase
+    .from("movements")
+    .update({ deleted_at: new Date().toISOString(), updated_by: userId })
+    .in("id", ids)
+    .eq("owner_user_id", userId);
+
+  if (error) {
+    throw error;
+  }
+
+  return ids.length;
 }
 
 export async function generateFixedExpenseMovements(
@@ -117,10 +241,19 @@ export async function generateFixedExpenseMovements(
     return 0;
   }
 
+  return insertFixedExpenseMovements(supabase, userId, rule, pending);
+}
+
+async function insertFixedExpenseMovements(
+  supabase: SupabaseClient,
+  userId: string,
+  rule: FixedExpenseListItem,
+  occurrences: Array<{ occurredOn: string }>
+): Promise<number> {
   const { data: inserted, error: insertError } = await supabase
     .from("movements")
     .insert(
-      pending.map((occurrence) => ({
+      occurrences.map((occurrence) => ({
         owner_user_id: userId,
         household_id: rule.isSharedWithHousehold ? rule.householdId : null,
         account_id: rule.accountId,
@@ -160,7 +293,7 @@ export async function generateFixedExpenseMovements(
     }
   }
 
-  return pending.length;
+  return occurrences.length;
 }
 
 export function toFixedExpensePayload(userId: string, input: FixedExpenseFormInput) {

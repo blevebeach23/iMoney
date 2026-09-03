@@ -9,7 +9,7 @@ import { getCategoryTree } from "@/services/categories/category-service";
 import { getFunds } from "@/services/funds/fund-service";
 import { getActiveHouseholdOptions } from "@/services/households/household-service";
 import { getMovements, type MovementFilters } from "@/services/movements/movement-service";
-import { buildMovementTimeline, transfersCanBeShownWithMovementFilters } from "@/services/timeline/timeline-service";
+import { buildMovementTimeline, filterTimelineFutureItems, transfersCanBeShownWithMovementFilters } from "@/services/timeline/timeline-service";
 import { getTransfers } from "@/services/transfers/transfer-service";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +37,7 @@ export default async function MovementsPage({ searchParams }: Readonly<{ searchP
     reimbursement: (firstParam(searchParams.reimbursement) as MovementFilters["reimbursement"]) || "all",
     shared: (firstParam(searchParams.shared) as MovementFilters["shared"]) || "all"
   };
+  const showFuture = firstParam(searchParams.showFuture) === "1";
 
   const showTransfers = transfersCanBeShownWithMovementFilters(filters);
   const showMovements = filters.type !== "transfer";
@@ -49,7 +50,7 @@ export default async function MovementsPage({ searchParams }: Readonly<{ searchP
     showMovements ? getMovements(supabase, user.id, movementFilters) : Promise.resolve([]),
     showTransfers ? getTransfers(supabase, user.id, { period: filters.period, containerId: filters.containerId, shared: filters.shared }) : Promise.resolve([])
   ]);
-  const timeline = buildMovementTimeline(movements, transfers);
+  const timeline = filterTimelineFutureItems(buildMovementTimeline(movements, transfers), showFuture);
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(searchParams)) {
     const first = firstParam(value);
@@ -74,6 +75,12 @@ export default async function MovementsPage({ searchParams }: Readonly<{ searchP
       </header>
       <div className="space-y-4">
         <MovementFiltersForm accounts={accounts} categoryTree={categoryTree} filters={filters} funds={funds} />
+        <Link
+          href={showFuture ? returnTo.replace(/[?&]showFuture=1/, "") : `${returnTo}${returnTo.includes("?") ? "&" : "?"}showFuture=1`}
+          className="flex min-h-11 items-center justify-center rounded-md border border-border bg-white px-4 text-sm font-semibold"
+        >
+          {showFuture ? "Nascondi futuri" : "Mostra futuri"}
+        </Link>
         <MovementTimeline accounts={accounts} categoryTree={categoryTree} funds={funds} households={households} items={timeline} returnTo={returnTo} />
       </div>
     </main>

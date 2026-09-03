@@ -6,7 +6,9 @@ import { toFieldErrors, type FormState } from "@/lib/auth/validation";
 import { movementFormSchema, movementRequestDecisionSchema, movementRequestFormSchema, parseContainerId } from "@/lib/movements/validation";
 import { safeMovementsReturnTo } from "@/lib/navigation/return-to";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { createMovement, duplicateMovement, getMovementById, softDeleteMovement, updateMovement } from "@/services/movements/movement-service";
+import { rebuildBalanceCaches } from "@/services/balances/balance-service";
+import { createMovement, createMovementBatch, duplicateMovement, getMovementById, softDeleteMovement, softDeleteMovementBatch, updateMovement } from "@/services/movements/movement-service";
+import { softDeleteTransferBatch } from "@/services/transfers/transfer-service";
 import {
   acceptMovementRequest,
   cancelMovementRequest,
@@ -54,6 +56,24 @@ function formDataToMovementObject(formData: FormData) {
     householdId: String(formData.get("householdId") ?? ""),
     notes: String(formData.get("notes") ?? "")
   };
+}
+
+function formDataToMovementObjects(formData: FormData) {
+  const rowCount = Number(formData.get("rowCount") ?? 1);
+  if (!Number.isFinite(rowCount) || rowCount <= 1) {
+    return [formDataToMovementObject(formData)];
+  }
+
+  return Array.from({ length: rowCount }, (_, index) => {
+    const row = new FormData();
+    for (const field of ["occurredOn", "description", "categoryId", "type", "amount", "containerId", "isReimbursement", "reimbursementForMovementId", "sharedWithFamily", "householdId", "notes"]) {
+      const value = formData.get(`rows[${index}].${field}`);
+      if (value !== null) {
+        row.set(field, value);
+      }
+    }
+    return formDataToMovementObject(row);
+  });
 }
 
 function categoryLabelFromForm(formData: FormData) {
@@ -150,7 +170,8 @@ export async function saveMovementAction(_prevState: FormState, formData: FormDa
     redirect(`/family/movement-requests/${requestId}`);
   }
 
-  const parsed = movementFormSchema.safeParse(formDataToMovementObject(formData));
+  const movementObjects = formDataToMovementObjects(formData);
+  const parsed = parsedMovementPayload(formData, movementObjects);
 
   if (!parsed.success) {
     return { ok: false, fieldErrors: toFieldErrors(parsed.error) };
@@ -158,12 +179,14 @@ export async function saveMovementAction(_prevState: FormState, formData: FormDa
 
   try {
     const { supabase, user } = await requireUser();
-    if (parsed.data.id) {
+    if ("id" in parsed.data && parsed.data.id) {
       const movement = await updateMovement(supabase, user.id, { ...parsed.data, id: parsed.data.id });
       await notifySharedMovement(supabase, movement, "updated", user.id);
+      await rebuildBalanceCaches(supabase, user.id);
     } else {
-      const movement = await createMovement(supabase, user.id, parsed.data);
-      await notifySharedMovement(supabase, movement, "created", user.id);
+      const movements = Array.isArray(parsed.data) ? await createMovementBatch(supabase, user.id, parsed.data) : [await createMovement(supabase, user.id, parsed.data)];
+      await Promise.all(movements.map((movement) => notifySharedMovement(supabase, movement, "created", user.id)));
+      await rebuildBalanceCaches(supabase, user.id);
     }
   } catch (error) {
     return { ok: false, message: messageFromError(error) };
@@ -234,6 +257,7 @@ export async function deleteMovementAction(formData: FormData) {
   const { supabase, user } = await requireUser();
   const movement = await getMovementById(supabase, user.id, id);
   await softDeleteMovement(supabase, user.id, id);
+  await rebuildBalanceCaches(supabase, user.id);
   if (movement) {
     await notifySharedMovement(supabase, movement, "deleted", user.id);
   }
@@ -246,6 +270,7 @@ export async function duplicateMovementAction(formData: FormData) {
   const returnTo = safeMovementsReturnTo(formData.get("returnTo"));
   const { supabase, user } = await requireUser();
   await duplicateMovement(supabase, user.id, id);
+  await rebuildBalanceCaches(supabase, user.id);
   revalidatePath("/movements");
   redirect(returnTo);
 }
@@ -263,6 +288,8 @@ export async function bulkUpdateTimelineAction(formData: FormData) {
   const { supabase, user } = await requireUser();
   const movementUpdate: Record<string, string | boolean | null> = {};
   const transferUpdate: Record<string, string | boolean | null> = {};
+
+  await assertNoRecurringTimelineOccurrences(supabase, user.id, movementIds, transferIds);
 
   if (action === "date") {
     const occurredOn = String(formData.get("occurredOn") ?? "");
@@ -302,6 +329,16 @@ export async function bulkUpdateTimelineAction(formData: FormData) {
     transferUpdate.household_id = null;
   }
 
+  if (action === "delete") {
+    await softDeleteMovementBatch(supabase, user.id, movementIds);
+    await softDeleteTransferBatch(supabase, user.id, transferIds);
+    await rebuildBalanceCaches(supabase, user.id);
+    revalidatePath("/movements");
+    revalidatePath("/family");
+    revalidatePath("/");
+    redirect(returnTo);
+  }
+
   if (Object.keys(movementUpdate).length > 0 && movementIds.length > 0) {
     const { error } = await supabase.from("movements").update({ ...movementUpdate, updated_by: user.id }).in("id", movementIds).eq("owner_user_id", user.id).is("deleted_at", null);
     if (error) {
@@ -316,10 +353,23 @@ export async function bulkUpdateTimelineAction(formData: FormData) {
     }
   }
 
+  if (Object.keys(movementUpdate).length > 0 || Object.keys(transferUpdate).length > 0) {
+    await rebuildBalanceCaches(supabase, user.id);
+  }
+
   revalidatePath("/movements");
   revalidatePath("/family");
   revalidatePath("/");
   redirect(returnTo);
+}
+
+function parsedMovementPayload(formData: FormData, movementObjects: ReturnType<typeof formDataToMovementObjects>) {
+  const hasExistingId = Boolean(String(formData.get("id") ?? ""));
+  if (hasExistingId || movementObjects.length === 1) {
+    return movementFormSchema.safeParse(movementObjects[0]);
+  }
+
+  return movementFormSchema.array().min(1).safeParse(movementObjects);
 }
 
 function parseIdList(value: string): string[] {
@@ -328,4 +378,42 @@ function parseIdList(value: string): string[] {
     .split(",")
     .map((item) => item.trim())
     .filter((item) => uuid.test(item));
+}
+
+async function assertNoRecurringTimelineOccurrences(supabase: Awaited<ReturnType<typeof requireUser>>["supabase"], userId: string, movementIds: string[], transferIds: string[]) {
+  if (movementIds.length > 0) {
+    const { data, error } = await supabase
+      .from("movements")
+      .select("id")
+      .in("id", movementIds)
+      .eq("owner_user_id", userId)
+      .is("deleted_at", null)
+      .not("fixed_expense_id", "is", null);
+
+    if (error) {
+      throw error;
+    }
+
+    if ((data ?? []).length > 0) {
+      throw new Error("La selezione contiene occorrenze ricorrenti: apri la ricorrenza madre");
+    }
+  }
+
+  if (transferIds.length > 0) {
+    const { data, error } = await supabase
+      .from("transfers")
+      .select("id")
+      .in("id", transferIds)
+      .eq("owner_user_id", userId)
+      .is("deleted_at", null)
+      .not("recurring_transfer_id", "is", null);
+
+    if (error) {
+      throw error;
+    }
+
+    if ((data ?? []).length > 0) {
+      throw new Error("La selezione contiene occorrenze ricorrenti: apri la ricorrenza madre");
+    }
+  }
 }

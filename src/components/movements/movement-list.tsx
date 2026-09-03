@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRightLeft, Copy, Plus, Share2 } from "lucide-react";
+import { ArrowRightLeft, Copy, Plus, Share2, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { bulkUpdateTimelineAction, duplicateMovementAction } from "@/lib/movements/actions";
+import { accountOptionLabel } from "@/lib/accounts/labels";
 import type { Account, Fund } from "@/types/domain";
 import type { CategoryTreeItem } from "@/services/categories/category-service";
 import type { ActiveHouseholdOption } from "@/services/households/household-service";
@@ -29,7 +30,7 @@ function typeLabel(type: MovementListItem["type"]) {
 
 function containerOptions(accounts: Account[], funds: Fund[]) {
   return [
-    ...accounts.map((account) => ({ value: `account:${account.id}`, label: `Conto / ${account.name}` })),
+    ...accounts.map((account) => ({ value: `account:${account.id}`, label: accountOptionLabel(account) })),
     ...funds.map((fund) => ({ value: `fund:${fund.id}`, label: `Fondo / ${fund.name}` }))
   ];
 }
@@ -140,7 +141,7 @@ export function MovementTimeline({
         <span className="text-sm font-semibold">{selectionMode ? `${selectedIds.length} selezionati` : "Modifica multipla"}</span>
         <div className="flex gap-2">
           {selectionMode && (
-            <Button type="button" variant="secondary" onClick={() => setSelectedIds(items.map((item) => `${item.kind}:${item.id}`))}>
+            <Button type="button" variant="secondary" onClick={() => setSelectedIds(items.filter((item) => !isRecurringTimelineItem(item)).map((item) => `${item.kind}:${item.id}`))}>
               Seleziona tutti
             </Button>
           )}
@@ -188,11 +189,11 @@ function MovementTimelineCard({
     <article className="rounded-md border border-border bg-white p-4">
       {selectable && (
         <label className="mb-3 flex items-center gap-2 text-sm font-semibold">
-          <input type="checkbox" checked={selected} onChange={(event) => onSelectedChange?.(event.target.checked)} className="h-5 w-5" />
-          Seleziona
+          <input type="checkbox" checked={selected} disabled={Boolean(movement.fixedExpenseId)} onChange={(event) => onSelectedChange?.(event.target.checked)} className="h-5 w-5" />
+          {movement.fixedExpenseId ? "Gestito dalla ricorrenza" : "Seleziona"}
         </label>
       )}
-      <Link href={`/movements/${movement.id}?returnTo=${encodeURIComponent(returnTo)}`} className="block">
+      <Link href={movement.fixedExpenseId ? `/fixed-expenses/${movement.fixedExpenseId}/edit` : `/movements/${movement.id}?returnTo=${encodeURIComponent(returnTo)}`} className="block">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-zinc-500">{formatDate(movement.occurredOn)}</p>
@@ -217,16 +218,19 @@ function MovementTimelineCard({
             </span>
           )}
           {isFuture(movement.occurredOn) && <span className="rounded-md bg-amber-50 px-2 py-1 text-amber-700">Programmato</span>}
+          {movement.fixedExpenseId && <span className="rounded-md bg-violet-50 px-2 py-1 text-violet-700">Ricorrente</span>}
         </div>
       </Link>
-      <form action={duplicateMovementAction} className="mt-3">
-        <input type="hidden" name="id" value={movement.id} />
-        <input type="hidden" name="returnTo" value={returnTo} />
-        <Button type="submit" variant="secondary" className="w-full">
-          <Copy aria-hidden className="h-4 w-4" />
-          Duplica
-        </Button>
-      </form>
+      {!movement.fixedExpenseId && (
+        <form action={duplicateMovementAction} className="mt-3">
+          <input type="hidden" name="id" value={movement.id} />
+          <input type="hidden" name="returnTo" value={returnTo} />
+          <Button type="submit" variant="secondary" className="w-full">
+            <Copy aria-hidden className="h-4 w-4" />
+            Duplica
+          </Button>
+        </form>
+      )}
     </article>
   );
 }
@@ -244,11 +248,11 @@ function TransferTimelineCard({
     <article className="rounded-md border border-border bg-white p-4">
       {selectable && (
         <label className="mb-3 flex items-center gap-2 text-sm font-semibold">
-          <input type="checkbox" checked={selected} onChange={(event) => onSelectedChange?.(event.target.checked)} className="h-5 w-5" />
-          Seleziona
+          <input type="checkbox" checked={selected} disabled={Boolean(transfer.recurringTransferId)} onChange={(event) => onSelectedChange?.(event.target.checked)} className="h-5 w-5" />
+          {transfer.recurringTransferId ? "Gestito dalla ricorrenza" : "Seleziona"}
         </label>
       )}
-      <Link href={`/transfers/${transfer.id}?returnTo=${encodeURIComponent(returnTo)}`} className="block">
+      <Link href={transfer.recurringTransferId ? `/recurring-transfers/${transfer.recurringTransferId}/edit` : `/transfers/${transfer.id}?returnTo=${encodeURIComponent(returnTo)}`} className="block">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-zinc-500">{formatDate(transfer.occurredOn)}</p>
@@ -271,6 +275,7 @@ function TransferTimelineCard({
             </span>
           )}
           {isFuture(transfer.occurredOn) && <span className="rounded-md bg-amber-50 px-2 py-1 text-amber-700">Programmato</span>}
+          {transfer.recurringTransferId && <span className="rounded-md bg-violet-50 px-2 py-1 text-violet-700">Ricorrente</span>}
         </div>
       </Link>
     </article>
@@ -303,6 +308,8 @@ function BulkActionBar({
           { value: "unshare", label: "Rimuovi condivisione Family" }
         ]
       : [{ value: "unshare", label: "Rimuovi condivisione Family" }])
+    ,
+    { value: "delete", label: "Elimina" }
   ];
   const selectedMovements = selectedItems.filter((item) => item.kind === "movement").map((item) => item.id);
   const selectedTransfers = selectedItems.filter((item) => item.kind === "transfer").map((item) => item.id);
@@ -339,8 +346,18 @@ function BulkActionBar({
           ))}
         </select>
       )}
-      <Button type="submit" disabled={selectedItems.length === 0} className="w-full">
-        Applica a {selectedItems.length} selezionati
+      <Button
+        type="submit"
+        disabled={selectedItems.length === 0}
+        className="w-full"
+        onClick={(event) => {
+          if (bulkAction === "delete" && !window.confirm("Eliminare le operazioni selezionate?")) {
+            event.preventDefault();
+          }
+        }}
+      >
+        {bulkAction === "delete" && <Trash2 aria-hidden className="h-4 w-4" />}
+        {bulkAction === "delete" ? `Elimina ${selectedItems.length} selezionati` : `Applica a ${selectedItems.length} selezionati`}
       </Button>
     </form>
   );
@@ -352,4 +369,8 @@ function toggleId(ids: string[], id: string, checked: boolean) {
   }
 
   return ids.filter((item) => item !== id);
+}
+
+function isRecurringTimelineItem(item: TimelineItem) {
+  return item.kind === "movement" ? Boolean(item.movement.fixedExpenseId) : Boolean(item.transfer.recurringTransferId);
 }

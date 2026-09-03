@@ -5,6 +5,7 @@ import { Archive, Plus, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { deactivateAccountAction, deleteCreditCardSettingsAction, saveAccountAction, saveCreditCardSettingsAction } from "@/lib/master-data/actions";
 import { accountTypeOptions } from "@/lib/master-data/validation";
+import { accountDisplayName } from "@/lib/accounts/labels";
 import type { FormState } from "@/lib/auth/validation";
 import type { Account, CreditCardSettings } from "@/types/domain";
 import { FormMessage, PendingButton, SelectField, TextField } from "./field-controls";
@@ -121,7 +122,7 @@ export function AccountManager({ accounts, creditCardSettings }: Readonly<{ acco
           <article key={account.id} className="rounded-md border border-border bg-white p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-lg font-bold tracking-normal">{account.name}</h2>
+                <h2 className="text-lg font-bold tracking-normal">{accountDisplayName(account)}</h2>
                 <p className="mt-1 text-sm font-medium text-zinc-600">{accountTypeOptions.find((option) => option.value === account.type)?.label}</p>
               </div>
               <span className="rounded-md bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-700">Attivo</span>

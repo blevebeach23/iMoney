@@ -6,11 +6,13 @@ import { toFieldErrors, type FormState } from "@/lib/auth/validation";
 import { currentMonthRange } from "@/lib/calculations/dates";
 import { parseRecurringTransferContainerId, recurringTransferFormSchema } from "@/lib/recurring-transfers/validation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { rebuildBalanceCaches } from "@/services/balances/balance-service";
 import {
   createRecurringTransfer,
   deactivateRecurringTransfer,
   deleteRecurringTransfer,
   generateRecurringTransfers,
+  syncRecurringTransferFutureTransfers,
   updateRecurringTransfer
 } from "@/services/recurring-transfers/recurring-transfer-service";
 
@@ -82,10 +84,9 @@ export async function saveRecurringTransferAction(_prevState: FormState, formDat
       recurringTransferId = await createRecurringTransfer(supabase, user.id, parsed.data);
     }
 
-    if (parsed.data.isActive) {
-      const range = currentMonthRange();
-      await generateRecurringTransfers(supabase, user.id, String(recurringTransferId), range.monthStart, monthStartAfter(range.monthStart, 11));
-    }
+    const range = currentMonthRange();
+    await syncRecurringTransferFutureTransfers(supabase, user.id, String(recurringTransferId), range.monthStart, monthStartAfter(range.monthStart, 11));
+    await rebuildBalanceCaches(supabase, user.id);
   } catch (error) {
     return { ok: false, message: messageFromError(error) };
   }
@@ -100,6 +101,9 @@ export async function deactivateRecurringTransferAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const { supabase, user } = await requireUser();
   await deactivateRecurringTransfer(supabase, user.id, id);
+  const range = currentMonthRange();
+  await syncRecurringTransferFutureTransfers(supabase, user.id, id, range.monthStart, monthStartAfter(range.monthStart, 11));
+  await rebuildBalanceCaches(supabase, user.id);
   revalidatePath("/recurring-transfers");
 }
 
@@ -107,6 +111,9 @@ export async function deleteRecurringTransferAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const { supabase, user } = await requireUser();
   await deleteRecurringTransfer(supabase, user.id, id);
+  const range = currentMonthRange();
+  await syncRecurringTransferFutureTransfers(supabase, user.id, id, range.monthStart, monthStartAfter(range.monthStart, 11));
+  await rebuildBalanceCaches(supabase, user.id);
   revalidatePath("/recurring-transfers");
 }
 
@@ -116,6 +123,7 @@ export async function generateRecurringTransfersAction(formData: FormData) {
   const toMonthStart = String(formData.get("toMonthStart") ?? "");
   const { supabase, user } = await requireUser();
   await generateRecurringTransfers(supabase, user.id, id, fromMonthStart, toMonthStart);
+  await rebuildBalanceCaches(supabase, user.id);
   revalidatePath("/recurring-transfers");
   revalidatePath("/movements");
   revalidatePath("/");

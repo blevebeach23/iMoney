@@ -10,6 +10,7 @@ import { getUpcomingMovements } from "@/lib/calculations/upcoming";
 import { shortUserName } from "@/lib/profiles/display-name";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAccounts } from "@/services/accounts/account-service";
+import { rebuildBalanceCaches } from "@/services/balances/balance-service";
 import { getPersonalBudgetsForMonth } from "@/services/budgets/budget-service";
 import { buildVirtualCreditCardSettlementTransfers, generateDueCreditCardSettlements, getCreditCardForecasts, getCreditCardSettingsForUser } from "@/services/credit-cards/credit-card-service";
 import { getFunds } from "@/services/funds/fund-service";
@@ -64,6 +65,9 @@ export default async function Home({ searchParams }: Readonly<{ searchParams: Re
     today: range.today
   });
   const transfersUntilMonthEnd = createdSettlements > 0 ? await getTransfersUntil(supabase, user.id, range.monthEnd) : initialTransfersUntilMonthEnd;
+  if (createdSettlements > 0) {
+    await rebuildBalanceCaches(supabase, user.id, range.today);
+  }
   const summary = calculateMonthlySummary(monthMovements);
   const currentBalances = calculateFinancialBalances(accounts, funds, movementsUntilMonthEnd, transfersUntilMonthEnd, range.today, range.today);
   const creditCardForecasts = getCreditCardForecasts({

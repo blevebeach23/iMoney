@@ -32,6 +32,7 @@ export function FamilyDashboard({
   movementRequests,
   selectedMonth,
   sharedFunds,
+  showFuture,
   summary,
   timeline
 }: Readonly<{
@@ -46,6 +47,7 @@ export function FamilyDashboard({
   movementRequests: MovementRequest[];
   selectedMonth: string;
   sharedFunds: SharedHouseholdFund[];
+  showFuture: boolean;
   summary: MonthlySummary;
   timeline: TimelineItem[];
 }>) {
@@ -137,6 +139,12 @@ export function FamilyDashboard({
 
       <section className="mt-6 space-y-3">
         <h2 className="text-lg font-semibold text-foreground">Timeline famiglia</h2>
+        <Link
+          href={`/family?householdId=${householdId}&month=${selectedMonth}${showFuture ? "" : "&showFuture=1"}`}
+          className="flex min-h-11 items-center justify-center rounded-md border border-border bg-white px-4 text-sm font-semibold"
+        >
+          {showFuture ? "Nascondi futuri" : "Mostra futuri"}
+        </Link>
         {timeline.length === 0 ? (
           <p className="rounded-md border border-dashed border-border bg-white p-4 text-sm text-zinc-600">Nessuna operazione condivisa.</p>
         ) : (

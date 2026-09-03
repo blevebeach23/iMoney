@@ -10,6 +10,8 @@ export interface BalanceSnapshot {
 export interface CreditCardDue {
   accountId: string;
   name: string;
+  spent: string;
+  settled: string;
   due: string;
 }
 
@@ -58,7 +60,11 @@ export function calculateFundBalance(fund: Fund, movements: Movement[], transfer
 }
 
 export function calculateCreditCardDue(account: Account, movements: Movement[], transfers: Transfer[], cutoffDate: string): string {
-  return creditCardDue(account, movements, transfers, cutoffDate).due;
+  return calculateCreditCardExposure(account, movements, transfers, cutoffDate).due;
+}
+
+export function calculateCreditCardExposure(account: Account, movements: Movement[], transfers: Transfer[], cutoffDate: string): CreditCardDue {
+  return creditCardDue(account, movements, transfers, cutoffDate);
 }
 
 function accountBalance(account: Account, movements: Movement[], transfers: Transfer[], cutoffDate: string): BalanceSnapshot {
@@ -94,18 +100,20 @@ function fundBalance(fund: Fund, movements: Movement[], transfers: Transfer[], c
 }
 
 function creditCardDue(account: Account, movements: Movement[], transfers: Transfer[], cutoffDate: string): CreditCardDue {
-  const due = movements
+  const spent = movements
     .filter((movement) => movement.accountId === account.id && movement.occurredOn <= cutoffDate)
     .reduce((total, movement) => total.plus(creditCardMovementEffect(movement)), toDecimal(account.openingBalance));
 
-  const withSettlements = transfers
+  const settled = transfers
     .filter((transfer) => transfer.occurredOn <= cutoffDate)
-    .reduce((total, transfer) => total.plus(creditCardTransferEffect(account.id, transfer)), due);
+    .reduce((total, transfer) => total.plus(creditCardTransferEffect(account.id, transfer)), toDecimal(0));
 
   return {
     accountId: account.id,
     name: account.name,
-    due: formatMoney(withSettlements)
+    spent: formatMoney(spent),
+    settled: formatMoney(settled.abs()),
+    due: formatMoney(spent.plus(settled))
   };
 }
 

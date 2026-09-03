@@ -4,6 +4,7 @@ import { Check } from "lucide-react";
 import { useFormState } from "react-dom";
 import { FormMessage, PendingButton, SelectField } from "@/components/master-data/field-controls";
 import { acceptFixedExpenseRequestAction } from "@/lib/fixed-expenses/actions";
+import { accountOptionLabel } from "@/lib/accounts/labels";
 import type { FormState } from "@/lib/auth/validation";
 import type { Account, FixedExpenseRequest, Fund } from "@/types/domain";
 import type { CategoryTreeItem } from "@/services/categories/category-service";
@@ -16,7 +17,7 @@ function categoryOptions(categoryTree: CategoryTreeItem[]) {
 
 function containerOptions(accounts: Account[], funds: Fund[]) {
   return [
-    ...accounts.map((account) => ({ value: `account:${account.id}`, label: `Conto / ${account.name}` })),
+    ...accounts.map((account) => ({ value: `account:${account.id}`, label: accountOptionLabel(account) })),
     ...funds.map((fund) => ({ value: `fund:${fund.id}`, label: `Fondo / ${fund.name}` }))
   ];
 }

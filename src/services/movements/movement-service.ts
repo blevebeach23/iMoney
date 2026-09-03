@@ -281,7 +281,29 @@ export async function createMovement(supabase: SupabaseClient, userId: string, i
   return stripRawCategory(mapMovementListRow(data));
 }
 
+export async function createMovementBatch(supabase: SupabaseClient, userId: string, inputs: MovementFormInput[]) {
+  if (inputs.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from("movements")
+    .insert(inputs.map((input) => toMovementPayload(userId, input, true)))
+    .select("*, categories(name, macro_categories(id, name)), accounts(name), funds(name)");
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).map(mapMovementListRow).map(stripRawCategory);
+}
+
 export async function updateMovement(supabase: SupabaseClient, userId: string, input: MovementFormInput & { id: string }) {
+  const existing = await getMovementById(supabase, userId, input.id);
+  if (existing?.fixedExpenseId) {
+    throw new Error("Le occorrenze ricorrenti si modificano dalla ricorrenza madre");
+  }
+
   const { data, error } = await supabase
     .from("movements")
     .update(toMovementPayload(userId, input, false))
@@ -299,10 +321,48 @@ export async function updateMovement(supabase: SupabaseClient, userId: string, i
 }
 
 export async function softDeleteMovement(supabase: SupabaseClient, userId: string, movementId: string) {
+  const existing = await getMovementById(supabase, userId, movementId);
+  if (existing?.fixedExpenseId) {
+    throw new Error("Le occorrenze ricorrenti si eliminano dalla ricorrenza madre");
+  }
+
   const { error } = await supabase
     .from("movements")
     .update({ deleted_at: new Date().toISOString(), updated_by: userId })
     .eq("id", movementId)
+    .eq("owner_user_id", userId)
+    .is("deleted_at", null);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function softDeleteMovementBatch(supabase: SupabaseClient, userId: string, movementIds: string[]) {
+  if (movementIds.length === 0) {
+    return;
+  }
+
+  const { data: recurringRows, error: recurringError } = await supabase
+    .from("movements")
+    .select("id")
+    .in("id", movementIds)
+    .eq("owner_user_id", userId)
+    .is("deleted_at", null)
+    .not("fixed_expense_id", "is", null);
+
+  if (recurringError) {
+    throw recurringError;
+  }
+
+  if ((recurringRows ?? []).length > 0) {
+    throw new Error("La selezione contiene occorrenze ricorrenti: apri la ricorrenza madre");
+  }
+
+  const { error } = await supabase
+    .from("movements")
+    .update({ deleted_at: new Date().toISOString(), updated_by: userId })
+    .in("id", movementIds)
     .eq("owner_user_id", userId)
     .is("deleted_at", null);
 

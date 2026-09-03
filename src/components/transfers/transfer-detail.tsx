@@ -39,9 +39,25 @@ export function TransferDetail({ readOnly = false, returnTo = "/movements", tran
               </dd>
             </div>
           )}
+          {transfer.recurringTransferId && (
+            <div>
+              <dt className="font-semibold text-zinc-500">Ricorrenza</dt>
+              <dd>
+                <Link href={`/recurring-transfers/${transfer.recurringTransferId}/edit`} className="font-semibold text-primary">
+                  Apri ricorrenza madre
+                </Link>
+              </dd>
+            </div>
+          )}
         </dl>
       </article>
-      {!readOnly && (
+      {!readOnly && transfer.recurringTransferId && (
+        <Link href={`/recurring-transfers/${transfer.recurringTransferId}/edit`} className="flex min-h-11 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-white">
+          <Pencil aria-hidden className="h-4 w-4" />
+          Modifica ricorrenza
+        </Link>
+      )}
+      {!readOnly && !transfer.recurringTransferId && (
         <>
           <Link href={`/transfers/${transfer.id}/edit?returnTo=${encodeURIComponent(returnTo)}`} className="flex min-h-11 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-white">
             <Pencil aria-hidden className="h-4 w-4" />

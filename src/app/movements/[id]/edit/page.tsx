@@ -32,6 +32,10 @@ export default async function EditMovementPage({ params, searchParams }: Readonl
     notFound();
   }
 
+  if (movement.fixedExpenseId) {
+    redirect(`/fixed-expenses/${movement.fixedExpenseId}/edit`);
+  }
+
   return (
     <main className="mx-auto min-h-dvh max-w-md px-4 pb-24 pt-6">
       <header className="mb-6">

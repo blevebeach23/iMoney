@@ -1,9 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { normalizeText } from "@/lib/imports/normalization";
-import { getAccounts, getRebuiltAccountBalance } from "@/services/accounts/account-service";
-import { getFunds, getRebuiltFundBalance } from "@/services/funds/fund-service";
-import { getMovementsUntil } from "@/services/movements/movement-service";
-import { getTransfersUntil } from "@/services/transfers/transfer-service";
+import { rebuildBalanceCaches } from "@/services/balances/balance-service";
 import type { ImportBatch, MovementType } from "@/types/domain";
 
 type Row = Record<string, unknown>;
@@ -65,15 +62,15 @@ export async function confirmMovementImport(supabase: SupabaseClient, userId: st
     }
   }
 
-  await rebuildAffectedBalanceCaches(supabase, userId, rows);
+  await rebuildBalanceCaches(supabase, userId);
 
   return mapImportBatchRow(batch);
 }
 
 export async function undoImportBatch(supabase: SupabaseClient, userId: string, batchId: string) {
-  const { data: importedRows, error: readError } = await supabase
+  const { error: readError } = await supabase
     .from("movements")
-    .select("account_id, fund_id")
+    .select("id")
     .eq("owner_user_id", userId)
     .eq("import_batch_id", batchId)
     .is("deleted_at", null);
@@ -93,7 +90,7 @@ export async function undoImportBatch(supabase: SupabaseClient, userId: string, 
     throw error;
   }
 
-  await rebuildAffectedBalanceCaches(supabase, userId, (importedRows ?? []).map(mapAffectedImportMovementInput));
+  await rebuildBalanceCaches(supabase, userId);
 }
 
 export function buildImportBatchPayload(userId: string, filename: string, importedRows: number) {
@@ -255,58 +252,4 @@ function mapImportBatchRow(row: Row): ImportBatch {
     importedRows: Number(row.imported_rows),
     createdAt: String(row.created_at)
   };
-}
-
-function mapAffectedImportMovementInput(row: Row): Pick<ImportMovementInput, "accountId" | "fundId"> {
-  return {
-    accountId: row.account_id ? String(row.account_id) : null,
-    fundId: row.fund_id ? String(row.fund_id) : null
-  };
-}
-
-async function rebuildAffectedBalanceCaches(
-  supabase: SupabaseClient,
-  userId: string,
-  rows: Pick<ImportMovementInput, "accountId" | "fundId">[]
-) {
-  const { accountIds, fundIds } = getAffectedContainerIds(rows);
-
-  if (accountIds.size === 0 && fundIds.size === 0) {
-    return;
-  }
-
-  const cutoffDate = new Date().toISOString().slice(0, 10);
-  const [accounts, funds, movements, transfers] = await Promise.all([
-    getAccounts(supabase, userId),
-    getFunds(supabase, userId),
-    getMovementsUntil(supabase, userId, cutoffDate),
-    getTransfersUntil(supabase, userId, cutoffDate)
-  ]);
-  const cachedAt = new Date().toISOString();
-
-  for (const account of accounts.filter((account) => accountIds.has(account.id))) {
-    const { error } = await supabase
-      .from("accounts")
-      .update({ cached_balance: getRebuiltAccountBalance(account, movements, transfers, cutoffDate), cached_at: cachedAt })
-      .eq("id", account.id)
-      .eq("owner_user_id", userId)
-      .is("deleted_at", null);
-
-    if (error) {
-      throw error;
-    }
-  }
-
-  for (const fund of funds.filter((fund) => fundIds.has(fund.id))) {
-    const { error } = await supabase
-      .from("funds")
-      .update({ cached_balance: getRebuiltFundBalance(fund, movements, transfers, cutoffDate), cached_at: cachedAt })
-      .eq("id", fund.id)
-      .eq("owner_user_id", userId)
-      .is("deleted_at", null);
-
-    if (error) {
-      throw error;
-    }
-  }
 }

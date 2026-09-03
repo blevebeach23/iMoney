@@ -30,6 +30,10 @@ export default async function EditTransferPage({ params, searchParams }: Readonl
     notFound();
   }
 
+  if (transfer.recurringTransferId) {
+    redirect(`/recurring-transfers/${transfer.recurringTransferId}/edit`);
+  }
+
   return (
     <main className="mx-auto min-h-dvh max-w-md px-4 pb-24 pt-6">
       <header className="mb-6">

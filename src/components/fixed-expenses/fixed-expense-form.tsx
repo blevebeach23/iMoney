@@ -7,6 +7,7 @@ import { useFormState } from "react-dom";
 import { FormMessage, PendingButton, SelectField, TextField } from "@/components/master-data/field-controls";
 import type { FormState } from "@/lib/auth/validation";
 import { saveFixedExpenseAction } from "@/lib/fixed-expenses/actions";
+import { accountOptionLabel } from "@/lib/accounts/labels";
 import type { ActiveHouseholdOption } from "@/services/households/household-service";
 import type { CategoryTreeItem } from "@/services/categories/category-service";
 import type { FixedExpenseListItem } from "@/services/fixed-expenses/fixed-expense-service";
@@ -40,7 +41,7 @@ function categoryOptions(categoryTree: CategoryTreeItem[]) {
 
 function containerOptions(accounts: Account[], funds: Fund[]) {
   return [
-    ...accounts.map((account) => ({ value: `account:${account.id}`, label: `Conto / ${account.name}` })),
+    ...accounts.map((account) => ({ value: `account:${account.id}`, label: accountOptionLabel(account) })),
     ...funds.map((fund) => ({ value: `fund:${fund.id}`, label: `Fondo / ${fund.name}` }))
   ];
 }

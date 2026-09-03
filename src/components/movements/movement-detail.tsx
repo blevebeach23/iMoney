@@ -55,22 +55,41 @@ export function MovementDetail({ movement, returnTo = "/movements" }: Readonly<{
               <dd className="whitespace-pre-wrap">{movement.notes}</dd>
             </div>
           )}
+          {movement.fixedExpenseId && (
+            <div>
+              <dt className="font-semibold text-zinc-500">Ricorrenza</dt>
+              <dd>
+                <Link href={`/fixed-expenses/${movement.fixedExpenseId}/edit`} className="font-semibold text-primary">
+                  Apri ricorrenza madre
+                </Link>
+              </dd>
+            </div>
+          )}
         </dl>
       </article>
 
-      <Link href={`/movements/${movement.id}/edit?returnTo=${encodeURIComponent(returnTo)}`} className="flex min-h-11 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-white">
-        <Pencil aria-hidden className="h-4 w-4" />
-        Modifica
-      </Link>
-      <form action={duplicateMovementAction}>
-        <input type="hidden" name="id" value={movement.id} />
-        <input type="hidden" name="returnTo" value={returnTo} />
-        <Button type="submit" variant="secondary" className="w-full">
-          <Copy aria-hidden className="h-4 w-4" />
-          Duplica
-        </Button>
-      </form>
-      <DeleteMovementForm movementId={movement.id} returnTo={returnTo} />
+      {movement.fixedExpenseId ? (
+        <Link href={`/fixed-expenses/${movement.fixedExpenseId}/edit`} className="flex min-h-11 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-white">
+          <Pencil aria-hidden className="h-4 w-4" />
+          Modifica ricorrenza
+        </Link>
+      ) : (
+        <>
+          <Link href={`/movements/${movement.id}/edit?returnTo=${encodeURIComponent(returnTo)}`} className="flex min-h-11 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-white">
+            <Pencil aria-hidden className="h-4 w-4" />
+            Modifica
+          </Link>
+          <form action={duplicateMovementAction}>
+            <input type="hidden" name="id" value={movement.id} />
+            <input type="hidden" name="returnTo" value={returnTo} />
+            <Button type="submit" variant="secondary" className="w-full">
+              <Copy aria-hidden className="h-4 w-4" />
+              Duplica
+            </Button>
+          </form>
+          <DeleteMovementForm movementId={movement.id} returnTo={returnTo} />
+        </>
+      )}
     </div>
   );
 }

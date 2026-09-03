@@ -67,6 +67,88 @@ export async function updateRecurringTransfer(supabase: SupabaseClient, userId: 
   }
 }
 
+export async function syncRecurringTransferFutureTransfers(
+  supabase: SupabaseClient,
+  userId: string,
+  recurringTransferId: string,
+  fromMonthStart: string,
+  toMonthStart: string,
+  today = new Date().toISOString().slice(0, 10)
+): Promise<number> {
+  const rule = await getRecurringTransferById(supabase, userId, recurringTransferId);
+
+  if (!rule || !rule.isActive) {
+    return softDeleteFutureRecurringTransfers(supabase, userId, recurringTransferId, today);
+  }
+
+  const expected = buildRecurringTransferOccurrences(rule, fromMonthStart, toMonthStart).filter((occurrence) => occurrence.occurredOn >= today);
+  const expectedByDate = new Map(expected.map((occurrence) => [occurrence.occurredOn, occurrence]));
+  const { data: existingRows, error: existingError } = await supabase
+    .from("transfers")
+    .select("id, occurred_on")
+    .eq("recurring_transfer_id", recurringTransferId)
+    .eq("owner_user_id", userId)
+    .is("deleted_at", null)
+    .gte("occurred_on", today);
+
+  if (existingError) {
+    throw existingError;
+  }
+
+  let changed = 0;
+  const existingByDate = new Map((existingRows ?? []).map((row: Row) => [String(row.occurred_on), String(row.id)]));
+  const obsoleteIds = (existingRows ?? []).filter((row: Row) => !expectedByDate.has(String(row.occurred_on))).map((row: Row) => String(row.id));
+
+  if (obsoleteIds.length > 0) {
+    const { error } = await supabase
+      .from("transfers")
+      .update({ deleted_at: new Date().toISOString() })
+      .in("id", obsoleteIds)
+      .eq("owner_user_id", userId);
+
+    if (error) {
+      throw error;
+    }
+    changed += obsoleteIds.length;
+  }
+
+  for (const [occurredOn, transferId] of existingByDate) {
+    if (!expectedByDate.has(occurredOn)) {
+      continue;
+    }
+
+    const { error } = await supabase
+      .from("transfers")
+      .update({
+        household_id: rule.isSharedWithHousehold ? rule.householdId : null,
+        shared_with_family: rule.isSharedWithHousehold,
+        from_account_id: rule.fromAccountId,
+        to_account_id: rule.toAccountId,
+        from_fund_id: rule.fromFundId,
+        to_fund_id: rule.toFundId,
+        amount: rule.amount,
+        occurred_on: occurredOn,
+        description: rule.description
+      })
+      .eq("id", transferId)
+      .eq("owner_user_id", userId)
+      .is("deleted_at", null);
+
+    if (error) {
+      throw error;
+    }
+    changed += 1;
+  }
+
+  const missing = expected.filter((occurrence) => !existingByDate.has(occurrence.occurredOn));
+  if (missing.length > 0) {
+    const inserted = await insertRecurringTransfers(supabase, userId, rule, missing);
+    changed += inserted;
+  }
+
+  return changed;
+}
+
 export async function deactivateRecurringTransfer(supabase: SupabaseClient, userId: string, recurringTransferId: string) {
   const { error } = await supabase
     .from("recurring_transfers")
@@ -128,8 +210,17 @@ export async function generateRecurringTransfers(
     return 0;
   }
 
+  return insertRecurringTransfers(supabase, userId, rule, pending);
+}
+
+async function insertRecurringTransfers(
+  supabase: SupabaseClient,
+  userId: string,
+  rule: RecurringTransferListItem,
+  occurrences: RecurringTransferOccurrence[]
+): Promise<number> {
   const { error: insertError } = await supabase.from("transfers").insert(
-    pending.map((occurrence) => ({
+    occurrences.map((occurrence) => ({
       owner_user_id: userId,
       household_id: rule.isSharedWithHousehold ? rule.householdId : null,
       shared_with_family: rule.isSharedWithHousehold,
@@ -151,7 +242,34 @@ export async function generateRecurringTransfers(
     throw insertError;
   }
 
-  return pending.length;
+  return occurrences.length;
+}
+
+async function softDeleteFutureRecurringTransfers(supabase: SupabaseClient, userId: string, recurringTransferId: string, today: string): Promise<number> {
+  const { data, error: readError } = await supabase
+    .from("transfers")
+    .select("id")
+    .eq("recurring_transfer_id", recurringTransferId)
+    .eq("owner_user_id", userId)
+    .is("deleted_at", null)
+    .gte("occurred_on", today);
+
+  if (readError) {
+    throw readError;
+  }
+
+  const ids = (data ?? []).map((row: Row) => String(row.id));
+  if (ids.length === 0) {
+    return 0;
+  }
+
+  const { error } = await supabase.from("transfers").update({ deleted_at: new Date().toISOString() }).in("id", ids).eq("owner_user_id", userId);
+
+  if (error) {
+    throw error;
+  }
+
+  return ids.length;
 }
 
 export function buildRecurringTransferOccurrences(

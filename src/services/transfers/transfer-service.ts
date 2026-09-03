@@ -143,7 +143,26 @@ export async function createTransfer(supabase: SupabaseClient, userId: string, i
   return String(data.id);
 }
 
+export async function createTransferBatch(supabase: SupabaseClient, userId: string, inputs: TransferFormInput[]) {
+  if (inputs.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await supabase.from("transfers").insert(inputs.map((input) => toTransferPayload(userId, input))).select("id");
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).map((row: TransferRow) => String(row.id));
+}
+
 export async function updateTransfer(supabase: SupabaseClient, userId: string, input: TransferFormInput & { id: string }) {
+  const existing = await getTransferById(supabase, userId, input.id);
+  if (existing?.recurringTransferId) {
+    throw new Error("Le occorrenze ricorrenti si modificano dalla ricorrenza madre");
+  }
+
   const { error } = await supabase
     .from("transfers")
     .update(toTransferPayload(userId, input))
@@ -157,10 +176,48 @@ export async function updateTransfer(supabase: SupabaseClient, userId: string, i
 }
 
 export async function softDeleteTransfer(supabase: SupabaseClient, userId: string, transferId: string) {
+  const existing = await getTransferById(supabase, userId, transferId);
+  if (existing?.recurringTransferId) {
+    throw new Error("Le occorrenze ricorrenti si eliminano dalla ricorrenza madre");
+  }
+
   const { error } = await supabase
     .from("transfers")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", transferId)
+    .eq("owner_user_id", userId)
+    .is("deleted_at", null);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function softDeleteTransferBatch(supabase: SupabaseClient, userId: string, transferIds: string[]) {
+  if (transferIds.length === 0) {
+    return;
+  }
+
+  const { data: recurringRows, error: recurringError } = await supabase
+    .from("transfers")
+    .select("id")
+    .in("id", transferIds)
+    .eq("owner_user_id", userId)
+    .is("deleted_at", null)
+    .not("recurring_transfer_id", "is", null);
+
+  if (recurringError) {
+    throw recurringError;
+  }
+
+  if ((recurringRows ?? []).length > 0) {
+    throw new Error("La selezione contiene occorrenze ricorrenti: apri la ricorrenza madre");
+  }
+
+  const { error } = await supabase
+    .from("transfers")
+    .update({ deleted_at: new Date().toISOString() })
+    .in("id", transferIds)
     .eq("owner_user_id", userId)
     .is("deleted_at", null);
 

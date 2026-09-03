@@ -14,11 +14,28 @@ const fundInput = {
 };
 
 function writableSupabase() {
-  const is = vi.fn().mockResolvedValue({ error: null });
+  const row = {
+    id: "50000000-0000-0000-0000-000000000001",
+    owner_user_id: "00000000-0000-0000-0000-0000000000a1",
+    household_id: "10000000-0000-0000-0000-000000000001",
+    name: "Vacanze",
+    type: "holiday",
+    opening_balance: "100.00",
+    opening_balance_date: "2026-08-01",
+    cached_balance: "100.00",
+    cached_at: null,
+    target_amount: "500.00",
+    target_date: "2026-12-31",
+    shared_with_family: true,
+    deleted_at: null
+  };
+  const single = vi.fn().mockResolvedValue({ data: row, error: null });
+  const select = vi.fn().mockReturnValue({ single });
+  const is = vi.fn().mockReturnValue({ select });
   const eqOwner = vi.fn().mockReturnValue({ is });
   const eqId = vi.fn().mockReturnValue({ eq: eqOwner });
   const update = vi.fn().mockReturnValue({ eq: eqId });
-  const insert = vi.fn().mockResolvedValue({ error: null });
+  const insert = vi.fn().mockReturnValue({ select });
   const from = vi.fn().mockReturnValue({ insert, update });
 
   return {

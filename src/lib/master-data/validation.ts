@@ -3,9 +3,9 @@ import type { AccountType, FundType } from "@/types/domain";
 
 export const accountTypeOptions: Array<{ value: AccountType; label: string }> = [
   { value: "cash", label: "Contanti" },
-  { value: "bank", label: "Banca" },
+  { value: "bank", label: "Conto" },
   { value: "credit_card", label: "Carta di credito" },
-  { value: "other", label: "Altro" }
+  { value: "other", label: "Conto" }
 ];
 
 export const fundTypeOptions: Array<{ value: FundType; label: string }> = [

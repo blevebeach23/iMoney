@@ -189,16 +189,16 @@ export function DashboardPreview({
       <section className="mt-6 space-y-3">
         <h2 className="text-lg font-semibold text-foreground">Saldi finanziari</h2>
         {cashRows.map((item) => (
-          <BalanceRow key={item.id} icon={Wallet} label={`Contanti / ${item.name}`} value={item.balance} />
+          <BalanceRow key={item.id} icon={Wallet} label="Contanti" value={item.balance} />
         ))}
         {bankRows.map((item) => (
-          <BalanceRow key={item.id} icon={Landmark} label={`Conto corrente / ${item.name}`} value={item.balance} />
+          <BalanceRow key={item.id} icon={Landmark} label={`Conto ${item.name}`} value={item.balance} />
         ))}
         {forecastRows.map((item) => (
           <BalanceRow key={item.id} icon={WalletCards} label={`${item.name} previsto fine mese`} value={item.balance} />
         ))}
         {creditCardRows.map((item) => (
-          <BalanceRow key={item.accountId} icon={CreditCard} label={`${item.name} da addebitare`} value={item.due} />
+          <BalanceRow key={item.accountId} icon={CreditCard} label={`Carta di credito ${item.name} da addebitare`} value={item.due} />
         ))}
       </section>
 
@@ -209,7 +209,7 @@ export function DashboardPreview({
             <article key={forecast.accountId} className="rounded-md border border-border bg-white p-4 shadow-panel">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h3 className="font-bold">{forecast.accountName}</h3>
+                  <h3 className="font-bold">Carta di credito {forecast.accountName}</h3>
                   <p className="mt-1 text-sm text-zinc-600">Addebito su {forecast.settlementAccountName}</p>
                 </div>
                 <span className="rounded-md bg-zinc-100 px-2 py-1 text-xs font-semibold">{forecast.automaticSettlement ? "Automatico" : "Manuale"}</span>
@@ -234,7 +234,7 @@ export function DashboardPreview({
               </dl>
               {forecast.insufficientFunds && (
                 <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
-                  Fondi insufficienti per il prossimo addebito {forecast.accountName}: mancano EUR {forecast.missingAmount}
+                  Fondi insufficienti per il prossimo addebito della carta di credito {forecast.accountName}: mancano EUR {forecast.missingAmount}
                 </p>
               )}
             </article>

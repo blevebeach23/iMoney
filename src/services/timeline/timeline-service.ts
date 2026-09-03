@@ -35,6 +35,14 @@ export function buildMovementTimeline(movements: MovementListItem[], transfers: 
   ].sort((a, b) => b.occurredOn.localeCompare(a.occurredOn) || b.createdAt.localeCompare(a.createdAt) || a.kind.localeCompare(b.kind) || a.id.localeCompare(b.id));
 }
 
+export function filterTimelineFutureItems(items: TimelineItem[], showFuture: boolean, today = new Date().toISOString().slice(0, 10)): TimelineItem[] {
+  if (showFuture) {
+    return items;
+  }
+
+  return items.filter((item) => item.occurredOn <= today);
+}
+
 export function transfersCanBeShownWithMovementFilters(filters: {
   type?: "all" | "income" | "expense" | "reimbursement" | "transfer";
   macroCategoryId?: string;

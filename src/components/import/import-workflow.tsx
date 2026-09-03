@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { confirmImportAction, undoImportBatchAction } from "@/lib/imports/actions";
 import { csvRowsToObjects, parseCsv } from "@/lib/imports/csv";
 import { buildImportPreview, inferInitialColumns, type ImportColumnKey, type ImportMapping, type ImportPreview } from "@/lib/imports/mapping";
+import { accountOptionLabel } from "@/lib/accounts/labels";
 import type { ActiveHouseholdOption } from "@/services/households/household-service";
 import type { CategoryTreeItem } from "@/services/categories/category-service";
 import type { Account, Category, Fund, ImportBatch, Movement } from "@/types/domain";
@@ -16,7 +17,7 @@ const fields: Array<{ key: ImportColumnKey; label: string }> = [
   { key: "amount", label: "Importo" },
   { key: "type", label: "Tipo" },
   { key: "category", label: "Categoria" },
-  { key: "container", label: "Account/Fund" },
+  { key: "container", label: "Conto/Fondo" },
   { key: "reimbursement", label: "Rimborso" },
   { key: "shared", label: "Condivisione famiglia" },
   { key: "notes", label: "Note" }
@@ -28,7 +29,7 @@ function flattenCategories(categoryTree: CategoryTreeItem[]): Category[] {
 
 function containerOptions(accounts: Account[], funds: Fund[]) {
   return [
-    ...accounts.map((account) => ({ value: `account:${account.id}`, label: `Conto / ${account.name}` })),
+    ...accounts.map((account) => ({ value: `account:${account.id}`, label: accountOptionLabel(account) })),
     ...funds.map((fund) => ({ value: `fund:${fund.id}`, label: `Fondo / ${fund.name}` }))
   ];
 }
@@ -166,7 +167,7 @@ export function ImportWorkflow({
         <section className="space-y-4 rounded-md border border-border bg-white p-4 shadow-panel">
           <h2 className="text-lg font-semibold text-foreground">Default e categorie</h2>
           <Select label="Categoria default" value={defaultCategoryId} onChange={setDefaultCategoryId} options={categories.map((category) => ({ value: category.id, label: category.name }))} />
-          <Select label="Account/Fund default" value={defaultContainerId} onChange={setDefaultContainerId} options={containers} />
+          <Select label="Conto/Fondo default" value={defaultContainerId} onChange={setDefaultContainerId} options={containers} />
           <Select
             label="Categoria mancante"
             value={missingCategoryStrategy}
