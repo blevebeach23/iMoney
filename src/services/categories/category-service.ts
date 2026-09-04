@@ -184,34 +184,33 @@ async function getCategoryDeletionInfo(supabase: SupabaseClient, categories: Cat
   const categoryInfo = new Map<string, CategoryDeletionInfo>();
   const macroInfo = new Map<string, CategoryDeletionInfo>();
 
+  const categoryIds = categories.map((category) => category.id);
+  const macroIds = macros.map((macro) => macro.id);
+
+  const [movements, fixedExpenses, budgetsByCategory, movementRequests, fixedExpenseRequests, childCategories, budgetsByMacro] = await Promise.all([
+    selectReferencedIds(supabase, "movements", "category_id", categoryIds),
+    selectReferencedIds(supabase, "fixed_expenses", "category_id", categoryIds),
+    selectReferencedIds(supabase, "budgets", "category_id", categoryIds),
+    selectReferencedIds(supabase, "movement_requests", "category_id", categoryIds),
+    selectReferencedIds(supabase, "fixed_expense_requests", "category_id", categoryIds),
+    selectReferencedIds(supabase, "categories", "macro_category_id", macroIds),
+    selectReferencedIds(supabase, "budgets", "macro_category_id", macroIds)
+  ]);
+
   for (const category of categories) {
     const reasons: string[] = [];
-    if (await hasReference(supabase, "movements", "category_id", category.id)) {
-      reasons.push("movimenti");
-    }
-    if (await hasReference(supabase, "fixed_expenses", "category_id", category.id)) {
-      reasons.push("ricorrenze");
-    }
-    if (await hasReference(supabase, "budgets", "category_id", category.id)) {
-      reasons.push("budget");
-    }
-    if (await hasReference(supabase, "movement_requests", "category_id", category.id)) {
-      reasons.push("richieste movimenti");
-    }
-    if (await hasReference(supabase, "fixed_expense_requests", "category_id", category.id)) {
-      reasons.push("richieste ricorrenze");
-    }
+    if (movements.has(category.id)) reasons.push("movimenti");
+    if (fixedExpenses.has(category.id)) reasons.push("ricorrenze");
+    if (budgetsByCategory.has(category.id)) reasons.push("budget");
+    if (movementRequests.has(category.id)) reasons.push("richieste movimenti");
+    if (fixedExpenseRequests.has(category.id)) reasons.push("richieste ricorrenze");
     categoryInfo.set(category.id, reasons.length === 0 ? deletable() : blocked(reasons));
   }
 
   for (const macro of macros) {
     const reasons: string[] = [];
-    if (await hasReference(supabase, "categories", "macro_category_id", macro.id)) {
-      reasons.push("categorie figlie");
-    }
-    if (await hasReference(supabase, "budgets", "macro_category_id", macro.id)) {
-      reasons.push("budget");
-    }
+    if (childCategories.has(macro.id)) reasons.push("categorie figlie");
+    if (budgetsByMacro.has(macro.id)) reasons.push("budget");
     macroInfo.set(macro.id, reasons.length === 0 ? deletable() : blocked(reasons));
   }
 
@@ -225,14 +224,18 @@ function emptyDeletionInfo(categories: Category[], macros: MacroCategory[]) {
   };
 }
 
-async function hasReference(supabase: SupabaseClient, table: string, column: string, value: string) {
-  const { count, error } = await supabase.from(table).select("id", { count: "exact", head: true }).eq(column, value);
+async function selectReferencedIds(supabase: SupabaseClient, table: string, column: string, values: string[]) {
+  if (values.length === 0) {
+    return new Set<string>();
+  }
+
+  const { data, error } = await supabase.from(table).select(column).in(column, values);
 
   if (error) {
     throw error;
   }
 
-  return (count ?? 0) > 0;
+  return new Set((data ?? []).map((row) => String((row as unknown as Record<string, unknown>)[column])));
 }
 
 function deletable(): CategoryDeletionInfo {
