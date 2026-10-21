@@ -1,3 +1,4 @@
+import { synchronizeFinancialAutomation } from "@/services/automation/financial-automation-service";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { FamilyDashboard } from "@/components/family/family-dashboard";
@@ -32,6 +33,8 @@ export default async function FamilyPage({ searchParams }: Readonly<{ searchPara
   if (!user) {
     redirect("/login");
   }
+
+  await synchronizeFinancialAutomation(supabase, user.id);
 
   const households = await getActiveHouseholds(supabase, user.id);
   const selectedHouseholdId = firstParam(searchParams.householdId) ?? households[0]?.id;

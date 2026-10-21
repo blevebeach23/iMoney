@@ -1,3 +1,4 @@
+import { synchronizeFinancialAutomation } from "@/services/automation/financial-automation-service";
 import { notFound, redirect } from "next/navigation";
 import { TransferForm } from "@/components/transfers/transfer-form";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -18,6 +19,8 @@ export default async function EditTransferPage({ params, searchParams }: Readonl
   if (!user) {
     redirect("/login");
   }
+
+  await synchronizeFinancialAutomation(supabase, user.id);
 
   const [accounts, funds, households, transfer] = await Promise.all([
     getAccounts(supabase, user.id),

@@ -1,3 +1,4 @@
+import { todayInRome } from "@/lib/calculations/dates";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildFixedExpenseOccurrences, excludeExistingOccurrences } from "@/lib/fixed-expenses/schedule";
 import type { FixedExpenseFormInput } from "@/lib/fixed-expenses/validation";
@@ -72,7 +73,7 @@ export async function syncFixedExpenseFutureMovements(
   fixedExpenseId: string,
   fromMonthStart: string,
   toMonthStart: string,
-  today = new Date().toISOString().slice(0, 10)
+  today = todayInRome()
 ): Promise<number> {
   const rule = await getFixedExpenseById(supabase, userId, fixedExpenseId);
 
@@ -80,7 +81,7 @@ export async function syncFixedExpenseFutureMovements(
     throw new Error("Spesa ricorrente non trovata");
   }
 
-  const expected = buildFixedExpenseOccurrences(rule, fromMonthStart, toMonthStart).filter((occurrence) => occurrence.occurredOn >= today);
+  const expected = buildFixedExpenseOccurrences(rule, fromMonthStart, toMonthStart).filter((occurrence) => occurrence.occurredOn > today);
   const expectedByDate = new Map(expected.map((occurrence) => [occurrence.occurredOn, occurrence]));
   const { data: existingRows, error: existingError } = await supabase
     .from("movements")
@@ -88,7 +89,7 @@ export async function syncFixedExpenseFutureMovements(
     .eq("fixed_expense_id", fixedExpenseId)
     .eq("owner_user_id", userId)
     .is("deleted_at", null)
-    .gte("occurred_on", today);
+    .gt("occurred_on", today);
 
   if (existingError) {
     throw existingError;
@@ -171,7 +172,7 @@ export async function softDeleteFutureFixedExpenseMovements(
   supabase: SupabaseClient,
   userId: string,
   fixedExpenseId: string,
-  today = new Date().toISOString().slice(0, 10)
+  today = todayInRome()
 ): Promise<number> {
   const { data, error: readError } = await supabase
     .from("movements")
@@ -179,7 +180,7 @@ export async function softDeleteFutureFixedExpenseMovements(
     .eq("fixed_expense_id", fixedExpenseId)
     .eq("owner_user_id", userId)
     .is("deleted_at", null)
-    .gte("occurred_on", today);
+    .gt("occurred_on", today);
 
   if (readError) {
     throw readError;
@@ -222,18 +223,16 @@ export async function generateFixedExpenseMovements(
   }
 
   const { data: existingRows, error: existingError } = await supabase
-    .from("movements")
-    .select("fixed_expense_id, occurred_on")
-    .eq("fixed_expense_id", fixedExpenseId)
-    .is("deleted_at", null);
+    .from("recurring_occurrences")
+    .select("rule_id, scheduled_on")
+    .eq("kind", "movement")
+    .eq("rule_id", fixedExpenseId)
+    .eq("owner_user_id", userId);
 
-  if (existingError) {
-    throw existingError;
-  }
-
+  if (existingError) throw existingError;
   const existing = (existingRows ?? []).map((row: Row) => ({
-    fixedExpenseId: row.fixed_expense_id ? String(row.fixed_expense_id) : null,
-    occurredOn: String(row.occurred_on)
+    fixedExpenseId: String(row.rule_id),
+    occurredOn: String(row.scheduled_on)
   }));
   const pending = excludeExistingOccurrences(occurrences, existing);
 
@@ -293,7 +292,7 @@ async function insertFixedExpenseMovements(
     }
   }
 
-  return occurrences.length;
+  return (inserted ?? []).length;
 }
 
 export function toFixedExpensePayload(userId: string, input: FixedExpenseFormInput) {

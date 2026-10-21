@@ -1,5 +1,7 @@
 "use server";
 
+import { synchronizeFinancialAutomation } from "@/services/automation/financial-automation-service";
+
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { toFieldErrors, type FormState } from "@/lib/auth/validation";
@@ -34,6 +36,7 @@ async function requireUser() {
     redirect("/login");
   }
 
+  await synchronizeFinancialAutomation(supabase, user.id);
   return { supabase, user };
 }
 

@@ -1,3 +1,4 @@
+import { synchronizeFinancialAutomation } from "@/services/automation/financial-automation-service";
 import { redirect } from "next/navigation";
 import { FundManager } from "@/components/master-data/fund-manager";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -15,6 +16,8 @@ export default async function FundsPage() {
   if (!user) {
     redirect("/login");
   }
+
+  await synchronizeFinancialAutomation(supabase, user.id);
 
   const [funds, households] = await Promise.all([getFunds(supabase, user.id), getActiveHouseholds(supabase, user.id)]);
 

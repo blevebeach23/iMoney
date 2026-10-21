@@ -1,3 +1,4 @@
+import { synchronizeFinancialAutomation } from "@/services/automation/financial-automation-service";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Plus } from "lucide-react";
@@ -17,6 +18,8 @@ export default async function RecurringTransfersPage() {
   if (!user) {
     redirect("/login");
   }
+
+  await synchronizeFinancialAutomation(supabase, user.id);
 
   const recurringTransfers = await getRecurringTransfers(supabase, user.id);
   const range = currentMonthRange();

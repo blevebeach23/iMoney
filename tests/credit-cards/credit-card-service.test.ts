@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildVirtualCreditCardSettlementTransfers,
   generateDueCreditCardSettlements,
+  getCreditCardSettlementHistoryForUser,
   saveCreditCardSettings
 } from "@/services/credit-cards/credit-card-service";
 import type { Account, CreditCardSettings, Movement, Transfer } from "@/types/domain";
@@ -13,7 +14,7 @@ function account(partial: Partial<Account> = {}): Account {
     ownerUserId: "user-1",
     name: "Conto",
     type: "bank",
-    openingBalance: "1000.00",
+    openingBalance: partial.type === "credit_card" ? "0.00" : "1000.00",
     openingBalanceDate: "2026-09-01",
     cachedBalance: "1000.00",
     cachedAt: null,
@@ -147,34 +148,12 @@ describe("credit card service", () => {
   });
 
   it("generates one due settlement transfer and is idempotent with existing cycle", async () => {
-    const insert = vi.fn().mockResolvedValue({ error: null });
-    const supabase = { from: () => ({ insert }) } as unknown as SupabaseClient;
-    const accounts = [account(), account({ id: "card-1", name: "Visa", type: "credit_card", openingBalance: "0.00" })];
-
-    await expect(generateDueCreditCardSettlements(supabase, "user-1", {
-      accounts,
-      settings: [settings()],
-      movements: [movement()],
-      transfers: [],
-      today: "2026-10-05"
-    })).resolves.toBe(1);
-    expect(insert).toHaveBeenCalledWith(expect.objectContaining({
-      amount: "100.00",
-      credit_card_account_id: "card-1",
-      from_account_id: "bank-1",
-      shared_with_family: false,
-      to_account_id: "card-1"
-    }));
-
-    insert.mockClear();
-    await expect(generateDueCreditCardSettlements(supabase, "user-1", {
-      accounts,
-      settings: [settings()],
-      movements: [movement()],
-      transfers: [transfer()],
-      today: "2026-10-05"
-    })).resolves.toBe(0);
-    expect(insert).not.toHaveBeenCalled();
+    const rpc = vi.fn().mockResolvedValueOnce({ data: 1, error: null }).mockResolvedValueOnce({ data: 0, error: null });
+    const supabase = { rpc } as unknown as SupabaseClient;
+    const input = { accounts: [account()], settings: [settings()], movements: [movement()], transfers: [] as Transfer[], today: "2026-10-05" };
+    await expect(generateDueCreditCardSettlements(supabase, "user-1", input)).resolves.toBe(1);
+    await expect(generateDueCreditCardSettlements(supabase, "user-1", input)).resolves.toBe(0);
+    expect(rpc).toHaveBeenCalledWith("sync_financial_automation", { p_owner: "user-1" });
   });
 
   it("supports two cards on the same bank account and cards on different accounts", async () => {
@@ -230,4 +209,32 @@ describe("credit card service", () => {
     ]);
     expect(virtual.every((item) => item.isSharedWithHousehold === false && item.householdId === null)).toBe(true);
   });
+  it("loads only owned settlement metadata including deleted identities, with complete pagination", async () => {
+    const row = { id: "settlement-1", owner_user_id: "user-1", credit_card_account_id: "card-1", credit_card_cycle_end_on: "2026-09-30", amount: "100.00", occurred_on: "2026-10-05", deleted_at: "2026-10-06T00:00:00Z" };
+    const pages = [Array.from({ length: 500 }, (_, i) => ({ ...row, id: `settlement-${i}` })), [{ ...row, id: "settlement-last", deleted_at: null }]];
+    const query = {
+      eq: vi.fn(() => query), not: vi.fn(() => query), order: vi.fn(() => query), limit: vi.fn(() => query), gt: vi.fn(() => query), is: vi.fn(() => query),
+      then: (resolve: (value: unknown) => unknown) => resolve({ data: pages.shift(), error: null })
+    };
+    const select = vi.fn(() => query);
+    const from = vi.fn(() => ({ select }));
+    const result = await getCreditCardSettlementHistoryForUser({ from } as unknown as SupabaseClient, "user-1");
+    expect(result).toHaveLength(501);
+    expect(result[0]).toMatchObject({ ownerUserId: "user-1", creditCardAccountId: "card-1", creditCardCycleEndOn: "2026-09-30", deletedAt: row.deleted_at });
+    expect(result[500].deletedAt).toBeNull();
+    expect(from).toHaveBeenCalledWith("transfers");
+    expect(select).toHaveBeenCalledWith("id, owner_user_id, credit_card_account_id, credit_card_cycle_end_on, amount, occurred_on, deleted_at");
+    expect(query.eq).toHaveBeenCalledWith("owner_user_id", "user-1");
+    expect(query.not).toHaveBeenCalledWith("credit_card_account_id", "is", null);
+    expect(query.gt).toHaveBeenCalledWith("id", "settlement-499");
+    expect(query.is).not.toHaveBeenCalled();
+  });
+
+  it("propagates settlement history errors instead of silently reopening cycles", async () => {
+    const error = { message: "Settlement history unavailable" };
+    const query = { eq: () => query, not: () => query, order: () => query, limit: () => Promise.resolve({ data: null, error }) };
+    const supabase = { from: () => ({ select: () => query }) } as unknown as SupabaseClient;
+    await expect(getCreditCardSettlementHistoryForUser(supabase, "user-1")).rejects.toEqual(error);
+  });
+
 });

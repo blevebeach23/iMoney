@@ -1,3 +1,4 @@
+import { synchronizeFinancialAutomation } from "@/services/automation/financial-automation-service";
 import { notFound, redirect } from "next/navigation";
 import { TransferDetail } from "@/components/transfers/transfer-detail";
 import { safeMovementsReturnTo } from "@/lib/navigation/return-to";
@@ -15,6 +16,8 @@ export default async function TransferDetailPage({ params, searchParams }: Reado
   if (!user) {
     redirect("/login");
   }
+
+  await synchronizeFinancialAutomation(supabase, user.id);
 
   const transfer = await getTransferById(supabase, user.id, params.id);
 

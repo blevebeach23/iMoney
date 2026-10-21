@@ -71,7 +71,7 @@ describe("recurring transfer service", () => {
   });
 
   it("generates normal transfers idempotently", async () => {
-    const insert = vi.fn().mockResolvedValue({ error: null });
+    const insert = vi.fn(() => ({ select: vi.fn().mockResolvedValue({ data: [{ id: "first" }, { id: "second" }], error: null }) }));
     const supabase = recurringTransferSupabase({ existing: [], insert, rule: recurringTransferRow() });
 
     await expect(generateRecurringTransfers(supabase, userId, recurringTransferId, "2026-09-01", "2026-10-01")).resolves.toBe(2);
@@ -85,7 +85,7 @@ describe("recurring transfer service", () => {
   it("does not generate duplicate or inactive recurring transfers", async () => {
     const insert = vi.fn();
     const withExisting = recurringTransferSupabase({
-      existing: [{ recurring_transfer_id: recurringTransferId, occurred_on: "2026-09-10" }],
+      existing: [{ rule_id: recurringTransferId, scheduled_on: "2026-09-10" }],
       insert,
       rule: recurringTransferRow()
     });
@@ -106,6 +106,9 @@ function recurringTransferSupabase(input: { existing: Array<Record<string, strin
         return { select: vi.fn(() => query) };
       }
 
+      if (table === "recurring_occurrences") {
+        return { select: vi.fn(() => queryMock({ data: input.existing })) };
+      }
       if (table === "transfers") {
         return {
           insert: input.insert,

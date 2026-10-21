@@ -1,3 +1,4 @@
+import { synchronizeFinancialAutomation } from "@/services/automation/financial-automation-service";
 import { notFound, redirect } from "next/navigation";
 import { MovementForm } from "@/components/movements/movement-form";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -19,6 +20,8 @@ export default async function EditMovementPage({ params, searchParams }: Readonl
   if (!user) {
     redirect("/login");
   }
+
+  await synchronizeFinancialAutomation(supabase, user.id);
 
   const [accounts, funds, categoryTree, households, movement] = await Promise.all([
     getAccounts(supabase, user.id),

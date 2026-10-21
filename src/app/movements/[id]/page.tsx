@@ -1,3 +1,4 @@
+import { synchronizeFinancialAutomation } from "@/services/automation/financial-automation-service";
 import { notFound, redirect } from "next/navigation";
 import { MovementDetail } from "@/components/movements/movement-detail";
 import { safeMovementsReturnTo } from "@/lib/navigation/return-to";
@@ -15,6 +16,8 @@ export default async function MovementDetailPage({ params, searchParams }: Reado
   if (!user) {
     redirect("/login");
   }
+
+  await synchronizeFinancialAutomation(supabase, user.id);
 
   const movement = await getMovementById(supabase, user.id, params.id);
 

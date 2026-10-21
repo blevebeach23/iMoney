@@ -1,3 +1,4 @@
+import { synchronizeFinancialAutomation } from "@/services/automation/financial-automation-service";
 import { redirect } from "next/navigation";
 import { AccountManager } from "@/components/master-data/account-manager";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -15,6 +16,8 @@ export default async function AccountsPage() {
   if (!user) {
     redirect("/login");
   }
+
+  await synchronizeFinancialAutomation(supabase, user.id);
 
   const [accounts, creditCardSettings] = await Promise.all([getAccounts(supabase, user.id), getCreditCardSettingsForUser(supabase, user.id)]);
 

@@ -1,3 +1,4 @@
+import { synchronizeFinancialAutomation } from "@/services/automation/financial-automation-service";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { calculateCategoryAggregates } from "@/lib/calculations/category-aggregates";
@@ -21,6 +22,8 @@ export default async function MonthDetailPage({ params }: Readonly<{ params: { m
   if (!user) {
     redirect("/login");
   }
+
+  await synchronizeFinancialAutomation(supabase, user.id);
 
   const range = monthRangeFromYearMonth(params.month);
   const [movements, categoryInfo] = await Promise.all([

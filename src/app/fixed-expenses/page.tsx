@@ -1,3 +1,4 @@
+import { synchronizeFinancialAutomation } from "@/services/automation/financial-automation-service";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Plus } from "lucide-react";
@@ -17,6 +18,8 @@ export default async function FixedExpensesPage() {
   if (!user) {
     redirect("/login");
   }
+
+  await synchronizeFinancialAutomation(supabase, user.id);
 
   const fixedExpenses = await getFixedExpenses(supabase, user.id);
   const range = currentMonthRange();

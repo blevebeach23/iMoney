@@ -1,30 +1,30 @@
 export function currentMonthRange(today = new Date()): { monthStart: string; monthEnd: string; today: string } {
-  const year = today.getFullYear();
-  const month = today.getMonth();
+  const [year, monthNumber] = todayInRome(today).split("-").map(Number);
+  const month = monthNumber - 1;
 
   return {
     monthStart: formatDate(new Date(year, month, 1)),
     monthEnd: formatDate(new Date(year, month + 1, 0)),
-    today: formatDate(today)
+    today: todayInRome(today)
   };
 }
 
 export function monthRangeFromYearMonth(yearMonth: string, today = new Date()): { monthStart: string; monthEnd: string; today: string; yearMonth: string } {
   if (!/^\d{4}-\d{2}$/.test(yearMonth)) {
-    return { ...currentMonthRange(today), yearMonth: formatYearMonth(today) };
+    return { ...currentMonthRange(today), yearMonth: todayInRome(today).slice(0, 7) };
   }
 
   const [year, month] = yearMonth.split("-").map(Number);
   const monthIndex = month - 1;
 
   if (!Number.isInteger(year) || !Number.isInteger(monthIndex) || monthIndex < 0 || monthIndex > 11) {
-    return { ...currentMonthRange(today), yearMonth: formatYearMonth(today) };
+    return { ...currentMonthRange(today), yearMonth: todayInRome(today).slice(0, 7) };
   }
 
   return {
     monthStart: formatDate(new Date(year, monthIndex, 1)),
     monthEnd: formatDate(new Date(year, monthIndex + 1, 0)),
-    today: formatDate(today),
+    today: todayInRome(today),
     yearMonth
   };
 }
@@ -51,4 +51,8 @@ export function formatDate(date: Date): string {
   const day = String(date.getDate()).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
+}
+
+export function todayInRome(now = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
 }

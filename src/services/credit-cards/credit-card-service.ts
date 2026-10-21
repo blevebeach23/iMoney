@@ -1,11 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   buildCreditCardForecasts,
-  calculateCreditCardCycleAmount,
-  calculateSettlementCycle,
-  hasSettlementTransfer,
+  hasCreditCardSettlement,
+  type CreditCardSettlementHistoryEntry,
+  type CreditCardSettlementIdentity,
   type CreditCardForecast
 } from "@/lib/calculations/credit-card-settlements";
+import { synchronizeFinancialAutomation } from "@/services/automation/financial-automation-service";
+import { toDecimal } from "@/lib/calculations/money";
 import type { Account, CreditCardSettings, Movement, Transfer } from "@/types/domain";
 
 type Row = Record<string, unknown>;
@@ -29,6 +31,36 @@ export async function getCreditCardSettingsForUser(supabase: SupabaseClient, use
   }
 
   return (data ?? []).map(mapCreditCardSettingsRow);
+}
+
+/** Settlement metadata only; ordinary transfer queries still exclude deleted rows.
+ * No date cutoff: cycle identity survives deletion and selecting a historical month.
+ */
+export async function getCreditCardSettlementHistoryForUser(supabase: SupabaseClient, userId: string): Promise<CreditCardSettlementHistoryEntry[]> {
+  const history: CreditCardSettlementHistoryEntry[] = [];
+  const pageSize = 500;
+  let after: string | undefined;
+  while (true) {
+    let query = supabase.from("transfers")
+      .select("id, owner_user_id, credit_card_account_id, credit_card_cycle_end_on, amount, occurred_on, deleted_at")
+      .eq("owner_user_id", userId)
+      .not("credit_card_account_id", "is", null)
+      .order("id", { ascending: true })
+      .limit(pageSize);
+    if (after) query = query.gt("id", after);
+    const { data, error } = await query;
+    if (error) throw error;
+    history.push(...(data ?? []).map((row: Row) => ({
+      ownerUserId: String(row.owner_user_id),
+      creditCardAccountId: String(row.credit_card_account_id),
+      creditCardCycleEndOn: String(row.credit_card_cycle_end_on),
+      amount: String(row.amount),
+      occurredOn: String(row.occurred_on),
+      deletedAt: row.deleted_at ? String(row.deleted_at) : null
+    })));
+    if (!data || data.length < pageSize) return history;
+    after = String(data[data.length - 1].id);
+  }
 }
 
 export async function saveCreditCardSettings(supabase: SupabaseClient, userId: string, input: CreditCardSettingsInput): Promise<void> {
@@ -72,19 +104,20 @@ export function getCreditCardForecasts(input: {
   settings: CreditCardSettings[];
   movements: Movement[];
   transfers: Transfer[];
+  settlementHistory: readonly CreditCardSettlementHistoryEntry[];
   today: string;
   bankBalances: Array<{ id: string; balance: string }>;
 }): CreditCardForecast[] {
   return buildCreditCardForecasts(input);
 }
 
-export function buildVirtualCreditCardSettlementTransfers(userId: string, forecasts: CreditCardForecast[], existingTransfers: Transfer[] = []): Transfer[] {
+export function buildVirtualCreditCardSettlementTransfers(userId: string, forecasts: CreditCardForecast[], settlementHistory: readonly CreditCardSettlementIdentity[] = []): Transfer[] {
   return forecasts
     .filter(
       (forecast) =>
         forecast.automaticSettlement &&
-        Number(forecast.amountDue) > 0 &&
-        !hasSettlementTransfer(existingTransfers, forecast.accountId, forecast.cycleStartOn, forecast.cycleEndOn)
+        toDecimal(forecast.amountDue).gt(0) &&
+        !hasCreditCardSettlement(settlementHistory, userId, forecast.accountId, forecast.cycleEndOn)
     )
     .map((forecast) => ({
       id: `credit-card-settlement:${forecast.accountId}:${forecast.cycleStartOn}:${forecast.cycleEndOn}`,
@@ -113,53 +146,8 @@ export async function generateDueCreditCardSettlements(supabase: SupabaseClient,
   transfers: Transfer[];
   today: string;
 }): Promise<number> {
-  const accountsById = new Map(input.accounts.map((account) => [account.id, account]));
-  let created = 0;
-
-  for (const setting of input.settings.filter((item) => item.automaticSettlement)) {
-    const card = accountsById.get(setting.accountId);
-    const settlementAccount = accountsById.get(setting.settlementAccountId);
-    if (!card || card.type !== "credit_card" || !settlementAccount || settlementAccount.type !== "bank") {
-      continue;
-    }
-
-    const cycle = calculateSettlementCycle(input.today, setting.statementClosingDay, setting.paymentDay);
-    if (cycle.paymentOn > input.today || hasSettlementTransfer(input.transfers, card.id, cycle.cycleStartOn, cycle.cycleEndOn)) {
-      continue;
-    }
-
-    const amount = calculateCreditCardCycleAmount(card.id, input.movements, cycle.cycleStartOn, cycle.cycleEndOn);
-    if (Number(amount) <= 0) {
-      continue;
-    }
-
-    const { error } = await supabase.from("transfers").insert({
-      owner_user_id: userId,
-      household_id: null,
-      shared_with_family: false,
-      from_account_id: setting.settlementAccountId,
-      to_account_id: setting.accountId,
-      from_fund_id: null,
-      to_fund_id: null,
-      amount,
-      occurred_on: cycle.paymentOn,
-      description: `Addebito Carta ${card.name}`,
-      credit_card_account_id: card.id,
-      credit_card_cycle_start_on: cycle.cycleStartOn,
-      credit_card_cycle_end_on: cycle.cycleEndOn
-    });
-
-    if (error) {
-      if (String(error.code) === "23505") {
-        continue;
-      }
-      throw error;
-    }
-
-    created += 1;
-  }
-
-  return created;
+  void input; // The database reads a consistent, complete history rather than page-filtered arrays.
+  return synchronizeFinancialAutomation(supabase, userId);
 }
 
 async function assertCreditCardSettingsAccess(supabase: SupabaseClient, userId: string, input: CreditCardSettingsInput): Promise<void> {

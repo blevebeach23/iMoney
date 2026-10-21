@@ -1,4 +1,6 @@
-import { CalendarDays, CreditCard, Landmark, Wallet, WalletCards, type LucideIcon } from "lucide-react";
+import { CurrentAvailability } from "./current-availability";
+import type { LiquidityForecastEvent, LiquiditySummary } from "@/lib/calculations/liquidity";
+import { CalendarDays, WalletCards, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import type { AnnualTrendPoint } from "@/lib/calculations/annual-trend";
 import type { BudgetReport } from "@/lib/calculations/budget";
@@ -90,6 +92,8 @@ const sampleMovements: Movement[] = [
 ];
 
 interface DashboardPreviewProps {
+  liquidity?: LiquiditySummary;
+  liquidityEvents?: LiquidityForecastEvent[];
   annualTrend?: AnnualTrendPoint[];
   balances?: FinancialBalances;
   budgetReport?: BudgetReport;
@@ -111,6 +115,8 @@ function movementSign(type: Movement["type"]) {
 }
 
 export function DashboardPreview({
+  liquidity,
+  liquidityEvents = [],
   annualTrend = [],
   balances,
   budgetReport,
@@ -123,8 +129,6 @@ export function DashboardPreview({
   userName = "Utente"
 }: DashboardPreviewProps) {
   const monthlySummary = summary ?? calculateMonthlySummary(sampleMovements);
-  const cashRows = balances?.cash ?? [{ id: "cash", name: "Contanti", balance: "0.00" }];
-  const bankRows = balances?.bank ?? [{ id: "bank", name: "Conto corrente", balance: "0.00" }];
   const fundRows = balances?.funds ?? [{ id: "fund", name: "Fondo vacanze", balance: "0.00" }];
   const creditCardRows = balances?.creditCardsDue ?? [];
   const forecastRows = balances?.forecastMonthEnd ?? [];
@@ -150,6 +154,8 @@ export function DashboardPreview({
           Apri
         </button>
       </form>
+
+      {liquidity && <CurrentAvailability summary={liquidity} cards={creditCardRows} forecasts={creditCardForecasts} />}
 
       <section className="mt-6 grid grid-cols-2 gap-3">
         <StatTile label="Entrate" value={`EUR ${monthlySummary.income}`} tone="good" />
@@ -187,26 +193,34 @@ export function DashboardPreview({
       </Link>
 
       <section className="mt-6 space-y-3">
-        <h2 className="text-lg font-semibold text-foreground">Saldi finanziari</h2>
-        {cashRows.map((item) => (
-          <BalanceRow key={item.id} icon={Wallet} label="Contanti" value={item.balance} />
-        ))}
-        {bankRows.map((item) => (
-          <BalanceRow key={item.id} icon={Landmark} label={`Conto ${item.name}`} value={item.balance} />
+        <h2 className="text-lg font-semibold text-foreground">Previsione di liquidità</h2>
+        {liquidity && (
+          <>
+            <p className="text-sm text-zinc-600">Saldo attuale: EUR {liquidity.liquidity}</p>
+            <p className="text-lg font-bold tabular-nums">Saldo previsto a fine {monthLabel}: EUR {liquidity.forecast}</p>
+            <p className="text-xs text-zinc-600">Include operazioni future e addebiti automatici carta entro il mese selezionato.</p>
+          </>
+        )}
+        {liquidityEvents.map((event) => (
+          <div key={event.id} className="flex justify-between gap-3 rounded-md border border-border bg-white p-3 text-sm">
+            <div className="min-w-0">
+              <p className="font-semibold">{formatDate(event.date)}</p>
+              <p className="break-words text-zinc-600">{event.description}</p>
+            </div>
+            <span className="shrink-0 font-semibold tabular-nums">EUR {event.effect}</span>
+          </div>
         ))}
         {forecastRows.map((item) => (
           <BalanceRow key={item.id} icon={WalletCards} label={`${item.name} previsto fine mese`} value={item.balance} />
         ))}
-        {creditCardRows.map((item) => (
-          <BalanceRow key={item.accountId} icon={CreditCard} label={`Carta di credito ${item.name} da addebitare`} value={item.due} />
-        ))}
+
       </section>
 
       {creditCardForecasts.length > 0 && (
         <section className="mt-6 space-y-3">
           <h2 className="text-lg font-semibold text-foreground">Carte di credito</h2>
           {creditCardForecasts.map((forecast) => (
-            <article key={forecast.accountId} className="rounded-md border border-border bg-white p-4 shadow-panel">
+            <article key={`${forecast.accountId}:${forecast.cycleEndOn}`} className="rounded-md border border-border bg-white p-4 shadow-panel">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h3 className="font-bold">Carta di credito {forecast.accountName}</h3>
@@ -226,10 +240,6 @@ export function DashboardPreview({
                 <div>
                   <dt className="text-zinc-500">Ciclo</dt>
                   <dd className="font-semibold">{formatDate(forecast.cycleStartOn)} - {formatDate(forecast.cycleEndOn)}</dd>
-                </div>
-                <div>
-                  <dt className="text-zinc-500">Nuovo ciclo</dt>
-                  <dd className="font-semibold tabular-nums">EUR {forecast.nextCycleAmount}</dd>
                 </div>
               </dl>
               {forecast.insufficientFunds && (
@@ -331,5 +341,3 @@ function BalanceRow({
     </div>
   );
 }
-
-

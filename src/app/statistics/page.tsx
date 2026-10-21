@@ -1,3 +1,4 @@
+import { synchronizeFinancialAutomation } from "@/services/automation/financial-automation-service";
 import { redirect } from "next/navigation";
 import { StatisticsDashboard } from "@/components/statistics/statistics-dashboard";
 import { monthRangeFromYearMonth, formatYearMonth } from "@/lib/calculations/dates";
@@ -35,6 +36,8 @@ export default async function StatisticsPage({ searchParams }: Readonly<{ search
   if (!user) {
     redirect("/login");
   }
+
+  await synchronizeFinancialAutomation(supabase, user.id);
 
   const scope = firstParam(searchParams.scope) === "family" ? "family" : "personal";
   const periodKind = periodKindFromParam(firstParam(searchParams.period));

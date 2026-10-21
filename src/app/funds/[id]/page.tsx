@@ -1,3 +1,4 @@
+import { synchronizeFinancialAutomation } from "@/services/automation/financial-automation-service";
 import { notFound, redirect } from "next/navigation";
 import { calculateFinancialBalances } from "@/lib/calculations/balances";
 import { currentMonthRange } from "@/lib/calculations/dates";
@@ -18,6 +19,8 @@ export default async function FundDetailPage({ params }: Readonly<{ params: { id
   if (!user) {
     redirect("/login");
   }
+
+  await synchronizeFinancialAutomation(supabase, user.id);
 
   const range = currentMonthRange();
   const [accounts, funds, movements, transfers] = await Promise.all([
