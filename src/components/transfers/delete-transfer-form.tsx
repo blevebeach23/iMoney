@@ -1,18 +1,15 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { DeleteConfirmationForm } from "@/components/ui/delete-confirmation-form";
 import { deleteTransferAction } from "@/lib/transfers/actions";
 
 export function DeleteTransferForm({ returnTo = "/movements", transferId }: Readonly<{ returnTo?: string; transferId: string }>) {
   return (
-    <form action={deleteTransferAction}>
+    <DeleteConfirmationForm action={deleteTransferAction} triggerLabel="Elimina trasferimento"
+      title="Eliminare questo trasferimento?"
+      description="Il trasferimento verrà eliminato definitivamente dalla timeline e dai calcoli dei saldi.">
       <input type="hidden" name="id" value={transferId} />
       <input type="hidden" name="returnTo" value={returnTo} />
-      <Button type="submit" variant="secondary" className="w-full text-red-700">
-        <Trash2 aria-hidden className="h-4 w-4" />
-        Elimina trasferimento
-      </Button>
-    </form>
+    </DeleteConfirmationForm>
   );
 }

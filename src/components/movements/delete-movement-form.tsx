@@ -1,27 +1,15 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { DeleteConfirmationForm } from "@/components/ui/delete-confirmation-form";
 import { deleteMovementAction } from "@/lib/movements/actions";
 
 export function DeleteMovementForm({ movementId, returnTo = "/movements" }: Readonly<{ movementId: string; returnTo?: string }>) {
   return (
-    <form action={deleteMovementAction}>
+    <DeleteConfirmationForm action={deleteMovementAction} triggerLabel="Elimina movimento"
+      title="Eliminare questo movimento?"
+      description="Il movimento verrà eliminato definitivamente dalla timeline e dai calcoli dei saldi.">
       <input type="hidden" name="id" value={movementId} />
       <input type="hidden" name="returnTo" value={returnTo} />
-      <Button
-        type="submit"
-        variant="secondary"
-        className="w-full text-red-700"
-        onClick={(event) => {
-          if (!window.confirm("Eliminare questo movimento?")) {
-            event.preventDefault();
-          }
-        }}
-      >
-        <Trash2 aria-hidden className="h-4 w-4" />
-        Elimina movimento
-      </Button>
-    </form>
+    </DeleteConfirmationForm>
   );
 }
