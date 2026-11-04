@@ -20,13 +20,16 @@ export type CategoryListItem = Category & {
   deletion: CategoryDeletionInfo;
 };
 
-export async function getCategoryTree(supabase: SupabaseClient, userId: string, options: { includeDeleted?: boolean; includeDeletionInfo?: boolean } = {}): Promise<CategoryTreeItem[]> {
+export async function getCategoryTree(supabase: SupabaseClient, userId: string, options: { includeDeleted?: boolean; includeDeletionInfo?: boolean; householdId?: string; includeHouseholds?: boolean } = {}): Promise<CategoryTreeItem[]> {
   let macroQuery = supabase
     .from("macro_categories")
     .select("*")
-    .eq("owner_user_id", userId)
     .order("sort_order", { ascending: true })
     .order("name", { ascending: true });
+
+  if (options.householdId) macroQuery = macroQuery.eq("household_id", options.householdId);
+  else if (options.includeHouseholds) macroQuery = macroQuery.or(`owner_user_id.eq.${userId},household_id.not.is.null`);
+  else macroQuery = macroQuery.eq("owner_user_id", userId);
 
   if (!options.includeDeleted) {
     macroQuery = macroQuery.is("deleted_at", null);
@@ -81,9 +84,10 @@ export async function getCategoryTree(supabase: SupabaseClient, userId: string, 
   }));
 }
 
-export async function createMacroCategory(supabase: SupabaseClient, userId: string, input: MacroCategoryInput) {
+export async function createMacroCategory(supabase: SupabaseClient, userId: string, input: MacroCategoryInput, householdId?: string) {
   const { error } = await supabase.from("macro_categories").insert({
-    owner_user_id: userId,
+    owner_user_id: householdId ? null : userId,
+    household_id: householdId ?? null,
     name: input.name,
     sort_order: input.sortOrder
   });
@@ -93,7 +97,7 @@ export async function createMacroCategory(supabase: SupabaseClient, userId: stri
   }
 }
 
-export async function updateMacroCategory(supabase: SupabaseClient, userId: string, input: Required<MacroCategoryInput>) {
+export async function updateMacroCategory(supabase: SupabaseClient, userId: string, input: MacroCategoryInput & { id: string }, householdId?: string) {
   const { error } = await supabase
     .from("macro_categories")
     .update({
@@ -101,7 +105,7 @@ export async function updateMacroCategory(supabase: SupabaseClient, userId: stri
       sort_order: input.sortOrder
     })
     .eq("id", input.id)
-    .eq("owner_user_id", userId)
+    .eq(householdId ? "household_id" : "owner_user_id", householdId ?? userId)
     .is("deleted_at", null);
 
   if (error) {
@@ -109,12 +113,12 @@ export async function updateMacroCategory(supabase: SupabaseClient, userId: stri
   }
 }
 
-export async function deactivateMacroCategory(supabase: SupabaseClient, userId: string, macroCategoryId: string) {
+export async function deactivateMacroCategory(supabase: SupabaseClient, userId: string, macroCategoryId: string, householdId?: string) {
   const { error } = await supabase
     .from("macro_categories")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", macroCategoryId)
-    .eq("owner_user_id", userId)
+    .eq(householdId ? "household_id" : "owner_user_id", householdId ?? userId)
     .is("deleted_at", null);
 
   if (error) {
@@ -187,32 +191,16 @@ async function getCategoryDeletionInfo(supabase: SupabaseClient, categories: Cat
   const categoryIds = categories.map((category) => category.id);
   const macroIds = macros.map((macro) => macro.id);
 
-  const [movements, fixedExpenses, budgetsByCategory, movementRequests, fixedExpenseRequests, childCategories, budgetsByMacro] = await Promise.all([
-    selectReferencedIds(supabase, "movements", "category_id", categoryIds),
-    selectReferencedIds(supabase, "fixed_expenses", "category_id", categoryIds),
-    selectReferencedIds(supabase, "budgets", "category_id", categoryIds),
-    selectReferencedIds(supabase, "movement_requests", "category_id", categoryIds),
-    selectReferencedIds(supabase, "fixed_expense_requests", "category_id", categoryIds),
-    selectReferencedIds(supabase, "categories", "macro_category_id", macroIds),
-    selectReferencedIds(supabase, "budgets", "macro_category_id", macroIds)
-  ]);
-
-  for (const category of categories) {
-    const reasons: string[] = [];
-    if (movements.has(category.id)) reasons.push("movimenti");
-    if (fixedExpenses.has(category.id)) reasons.push("ricorrenze");
-    if (budgetsByCategory.has(category.id)) reasons.push("budget");
-    if (movementRequests.has(category.id)) reasons.push("richieste movimenti");
-    if (fixedExpenseRequests.has(category.id)) reasons.push("richieste ricorrenze");
-    categoryInfo.set(category.id, reasons.length === 0 ? deletable() : blocked(reasons));
+  const { data, error } = await supabase.rpc("get_category_deletion_info", {
+    target_category_ids: categoryIds, target_macro_ids: macroIds
+  });
+  if (error) throw error;
+  for (const row of (data ?? []) as Array<{ kind: string; id: string; reasons: string[] }>) {
+    (row.kind === "macro" ? macroInfo : categoryInfo).set(row.id, row.reasons.length ? blocked(row.reasons) : deletable());
   }
-
-  for (const macro of macros) {
-    const reasons: string[] = [];
-    if (childCategories.has(macro.id)) reasons.push("categorie figlie");
-    if (budgetsByMacro.has(macro.id)) reasons.push("budget");
-    macroInfo.set(macro.id, reasons.length === 0 ? deletable() : blocked(reasons));
-  }
+  // Missing permission is never interpreted as permission to delete.
+  for (const id of categoryIds) if (!categoryInfo.has(id)) categoryInfo.set(id, blocked(["permessi insufficienti"]));
+  for (const id of macroIds) if (!macroInfo.has(id)) macroInfo.set(id, blocked(["permessi insufficienti"]));
 
   return { categories: categoryInfo, macros: macroInfo };
 }
@@ -222,20 +210,6 @@ function emptyDeletionInfo(categories: Category[], macros: MacroCategory[]) {
     categories: new Map(categories.map((category) => [category.id, deletable()])),
     macros: new Map(macros.map((macro) => [macro.id, deletable()]))
   };
-}
-
-async function selectReferencedIds(supabase: SupabaseClient, table: string, column: string, values: string[]) {
-  if (values.length === 0) {
-    return new Set<string>();
-  }
-
-  const { data, error } = await supabase.from(table).select(column).in(column, values);
-
-  if (error) {
-    throw error;
-  }
-
-  return new Set((data ?? []).map((row) => String((row as unknown as Record<string, unknown>)[column])));
 }
 
 function deletable(): CategoryDeletionInfo {

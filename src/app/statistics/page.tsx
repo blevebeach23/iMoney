@@ -1,3 +1,6 @@
+import Link from "next/link";
+import { calculateBudgetReport } from "@/lib/calculations/budget";
+import { personalViewMovements } from "@/lib/movements/view-scope";
 import { synchronizeFinancialAutomation } from "@/services/automation/financial-automation-service";
 import { redirect } from "next/navigation";
 import { StatisticsDashboard } from "@/components/statistics/statistics-dashboard";
@@ -49,19 +52,20 @@ export default async function StatisticsPage({ searchParams }: Readonly<{ search
   const archiveEnd = "2100-12-31";
   const households = await getActiveHouseholds(supabase, user.id);
   const selectedHouseholdId = firstParam(searchParams.householdId) ?? households[0]?.id ?? null;
+  const includeShared = firstParam(searchParams.includeShared) === "1";
   const familyEnabled = scope === "family" && Boolean(selectedHouseholdId);
 
   const [personalMovements, familyMovements, categoryInfo, budgets] = await Promise.all([
     getMovementsBetween(supabase, user.id, archiveStart, archiveEnd),
     familyEnabled ? getSharedHouseholdMovementsBetween(supabase, String(selectedHouseholdId), archiveStart, archiveEnd) : Promise.resolve([]),
-    getMovementCategoryInfo(supabase, user.id),
+    getMovementCategoryInfo(supabase, user.id, familyEnabled ? { householdId: String(selectedHouseholdId) } : { includeHouseholds: includeShared }),
     familyEnabled
       ? getHouseholdBudgetsForMonth(supabase, String(selectedHouseholdId), selectedMonthRange.monthStart)
       : getPersonalBudgetsForMonth(supabase, user.id, selectedMonthRange.monthStart)
   ]);
 
   const movements = filterMovementsForStatistics({
-    personalMovements,
+    personalMovements: personalViewMovements(personalMovements, includeShared),
     familyMovements,
     householdId: selectedHouseholdId,
     scope: scope as StatisticsScope
@@ -77,8 +81,23 @@ export default async function StatisticsPage({ searchParams }: Readonly<{ search
     selectedMonth,
     selectedYear
   });
+  if (!familyEnabled) {
+    report.budgetReport = calculateBudgetReport(
+      budgets,
+      personalViewMovements(personalMovements).filter((movement) => movement.occurredOn.startsWith(selectedMonth)),
+      categoryInfo
+    );
+  }
+  const toggleParams = new URLSearchParams({
+    month: selectedMonth,
+    period: periodKind,
+    year: String(selectedYear),
+    start: periodRange.startDate,
+    end: periodRange.endDate,
+    includeShared: includeShared ? "0" : "1"
+  });
 
-  return <StatisticsDashboard report={report} households={households} selectedHouseholdId={selectedHouseholdId} />;
+  return <>{!familyEnabled && <div className="mx-auto max-w-md px-4 pt-4"><Link className="flex min-h-11 items-center justify-center rounded-md border border-border px-3 text-sm font-semibold" href={`/statistics?${toggleParams}`}>{includeShared ? "Solo movimenti personali" : "Includi i miei movimenti condivisi"}</Link></div>}<StatisticsDashboard report={report} households={households} selectedHouseholdId={selectedHouseholdId} includeShared={includeShared} /></>;
 }
 
 function periodKindFromParam(value: string | undefined): StatisticsPeriodKind {

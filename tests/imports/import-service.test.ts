@@ -126,7 +126,7 @@ describe("import service payloads", () => {
     const supabase = categorySupabase({ macros: [], categories: [] });
 
     await expect(ensureImportOtherMacroCategory(supabase.client, "user-1")).resolves.toBe("macro-altro");
-    expect(supabase.macroInserts).toEqual([{ owner_user_id: "user-1", name: "Altro", sort_order: 1000 }]);
+    expect(supabase.macroInserts).toEqual([{ owner_user_id: "user-1", household_id: null, name: "Altro", sort_order: 1000 }]);
   });
 
   it("reuses an existing Altro macro category without duplicates", async () => {

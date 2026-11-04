@@ -92,6 +92,7 @@ const sampleMovements: Movement[] = [
 ];
 
 interface DashboardPreviewProps {
+  includeShared?: boolean;
   liquidity?: LiquiditySummary;
   liquidityEvents?: LiquidityForecastEvent[];
   annualTrend?: AnnualTrendPoint[];
@@ -115,6 +116,7 @@ function movementSign(type: Movement["type"]) {
 }
 
 export function DashboardPreview({
+  includeShared = false,
   liquidity,
   liquidityEvents = [],
   annualTrend = [],
@@ -147,6 +149,7 @@ export function DashboardPreview({
       <form className="mt-5 flex items-end gap-3">
         <label className="flex-1">
           <span className="text-sm font-semibold text-foreground">Mese</span>
+          {includeShared && <input type="hidden" name="includeShared" value="1" />}
           <input name="month" type="month" defaultValue={selectedMonth} className="mt-2 h-11 w-full rounded-md border border-border bg-white px-3" />
         </label>
         <button type="submit" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-white">

@@ -38,7 +38,7 @@ export default async function MovementsPage({ searchParams }: Readonly<{ searchP
     categoryId: firstParam(searchParams.categoryId) || undefined,
     containerId: firstParam(searchParams.containerId) || undefined,
     reimbursement: (firstParam(searchParams.reimbursement) as MovementFilters["reimbursement"]) || "all",
-    shared: (firstParam(searchParams.shared) as MovementFilters["shared"]) || "all"
+    shared: (firstParam(searchParams.shared) as MovementFilters["shared"]) || "no"
   };
   const showFuture = firstParam(searchParams.showFuture) === "1";
 
@@ -48,7 +48,7 @@ export default async function MovementsPage({ searchParams }: Readonly<{ searchP
   const [accounts, funds, categoryTree, households, movements, transfers] = await Promise.all([
     getAccounts(supabase, user.id),
     getFunds(supabase, user.id),
-    getCategoryTree(supabase, user.id),
+    getCategoryTree(supabase, user.id, { includeHouseholds: true }),
     getActiveHouseholdOptions(supabase, user.id),
     showMovements ? getMovements(supabase, user.id, movementFilters) : Promise.resolve([]),
     showTransfers ? getTransfers(supabase, user.id, { period: filters.period, containerId: filters.containerId, shared: filters.shared }) : Promise.resolve([])
@@ -62,6 +62,8 @@ export default async function MovementsPage({ searchParams }: Readonly<{ searchP
     }
   }
   const returnTo = query.size > 0 ? `/movements?${query.toString()}` : "/movements";
+  const sharedToggleQuery = new URLSearchParams(query);
+  sharedToggleQuery.set("shared", filters.shared === "no" ? "all" : "no");
 
   return (
     <main className="mx-auto min-h-dvh max-w-md px-4 pb-24 pt-6">
@@ -77,6 +79,7 @@ export default async function MovementsPage({ searchParams }: Readonly<{ searchP
         </Link>
       </header>
       <div className="space-y-4">
+        <Link href={`/movements?${sharedToggleQuery}`} className="flex min-h-11 items-center justify-center rounded-md border border-border px-3 text-sm font-semibold">{filters.shared === "no" ? "Includi i miei movimenti condivisi" : "Solo movimenti personali"}</Link>
         <MovementFiltersForm accounts={accounts} categoryTree={categoryTree} filters={filters} funds={funds} />
         <Link
           href={showFuture ? returnTo.replace(/[?&]showFuture=1/, "") : `${returnTo}${returnTo.includes("?") ? "&" : "?"}showFuture=1`}

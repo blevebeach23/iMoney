@@ -67,7 +67,7 @@ export default async function FamilyPage({ searchParams }: Readonly<{ searchPara
     getSharedHouseholdMovementsBetween(supabase, selectedHouseholdId, `${year}-01-01`, `${year}-12-31`),
     getSharedHouseholdTransfers(supabase, selectedHouseholdId, range.monthStart, range.monthEnd),
     getHouseholdBudgetsForMonth(supabase, selectedHouseholdId, range.monthStart),
-    getMovementCategoryInfo(supabase, user.id),
+    getMovementCategoryInfo(supabase, user.id, { householdId: selectedHouseholdId }),
     getSharedHouseholdFunds(supabase, selectedHouseholdId),
     getMovementRequestsForHousehold(supabase, selectedHouseholdId),
     getFixedExpenseRequestsForHousehold(supabase, selectedHouseholdId)
@@ -77,13 +77,16 @@ export default async function FamilyPage({ searchParams }: Readonly<{ searchPara
     redirect("/family/settings");
   }
 
-  const visibleMonthMovements = filterFamilySharedMovements(monthMovements, selectedHouseholdId);
+  const selectedCategory = firstParam(searchParams.categoryId);
+  const selectedMacro = firstParam(searchParams.macroCategoryId);
+  const allFamilyMonthMovements = filterFamilySharedMovements(monthMovements, selectedHouseholdId);
+  const visibleMonthMovements = allFamilyMonthMovements.filter(m=>(!selectedCategory || m.categoryId===selectedCategory) && (!selectedMacro || categoryInfo.get(m.categoryId ?? "")?.macroCategoryId===selectedMacro));
   const visibleYearMovements = filterFamilySharedMovements(yearMovements, selectedHouseholdId);
   const summary = calculateMonthlySummary(visibleMonthMovements);
   const aggregates = calculateCategoryAggregates(visibleMonthMovements, categoryInfo);
-  const budgetReport = calculateBudgetReport(budgets, visibleMonthMovements, categoryInfo);
+  const budgetReport = calculateBudgetReport(budgets, allFamilyMonthMovements, categoryInfo);
   const annualTrend = calculateAnnualTrend(visibleYearMovements, year);
-  const familyTimeline = filterTimelineFutureItems(buildMovementTimeline(visibleMonthMovements, monthTransfers), showFuture);
+  const familyTimeline = filterTimelineFutureItems(buildMovementTimeline(visibleMonthMovements, selectedCategory || selectedMacro ? [] : monthTransfers), showFuture);
 
   return (
     <FamilyDashboard

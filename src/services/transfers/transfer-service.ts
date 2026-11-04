@@ -1,3 +1,4 @@
+import { readAllPages } from "@/services/read-all-pages";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TransferFormInput } from "@/lib/transfers/validation";
 import type { Transfer } from "@/types/domain";
@@ -28,18 +29,16 @@ export interface ImportedTransferInput {
 }
 
 export async function getTransfersUntil(supabase: SupabaseClient, userId: string, cutoffDate: string): Promise<Transfer[]> {
-  const { data, error } = await supabase
+  const data = await readAllPages<TransferRow>((from, to) => supabase
     .from("transfers")
     .select("*")
     .eq("owner_user_id", userId)
     .is("deleted_at", null)
     .lte("occurred_on", cutoffDate)
     .order("occurred_on", { ascending: false })
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    throw error;
-  }
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .range(from, to));
 
   return (data ?? []).map(mapTransferRow);
 }

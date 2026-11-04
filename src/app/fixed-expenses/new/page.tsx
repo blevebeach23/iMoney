@@ -22,7 +22,7 @@ export default async function NewFixedExpensePage() {
   const [accounts, funds, categoryTree, households, requestRecipients] = await Promise.all([
     getAccounts(supabase, user.id),
     getFunds(supabase, user.id),
-    getCategoryTree(supabase, user.id),
+    getCategoryTree(supabase, user.id, { includeHouseholds: true }),
     getActiveHouseholdOptions(supabase, user.id),
     getFixedExpenseRequestRecipientOptions(supabase, user.id)
   ]);

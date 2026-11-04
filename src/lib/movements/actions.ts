@@ -334,6 +334,12 @@ export async function bulkUpdateTimelineAction(formData: FormData) {
     transferUpdate.household_id = null;
   }
 
+  if ((action === "share" || action === "unshare") && movementIds.length > 0) {
+    const categoryId = String(formData.get("categoryId") ?? "");
+    if (!categoryId) throw new Error("Scegli una categoria nel bilancio di destinazione");
+    movementUpdate.category_id = categoryId;
+  }
+
   if (action === "delete") {
     await softDeleteMovementBatch(supabase, user.id, movementIds);
     await softDeleteTransferBatch(supabase, user.id, transferIds);

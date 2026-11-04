@@ -1,5 +1,6 @@
 "use client";
 
+import { categoryOptionsForScope, categoryAfterScopeChange } from "@/lib/categories/scope";
 import { useState } from "react";
 import { useFormState } from "react-dom";
 import Link from "next/link";
@@ -26,15 +27,6 @@ interface MovementRequestRecipientOption {
 }
 
 const initialState: FormState = { ok: false };
-
-function categoryOptions(categoryTree: CategoryTreeItem[]) {
-  return categoryTree.flatMap((macro) =>
-    macro.categories.map((category) => ({
-      value: category.id,
-      label: `${macro.name} / ${category.name}`
-    }))
-  );
-}
 
 function containerOptions(accounts: Account[], funds: Fund[]) {
   return [
@@ -64,14 +56,23 @@ export function MovementForm({
   const [requestedForUserId, setRequestedForUserId] = useState("self");
   const [rows, setRows] = useState([0]);
   const today = new Date().toISOString().slice(0, 10);
-  const categories = categoryOptions(categoryTree);
+  const allCategories = categoryTree.flatMap((macro) => macro.categories);
   const containers = containerOptions(accounts, funds);
   const defaultHousehold = households[0];
+  const [selectedHouseholdId, setSelectedHouseholdId] = useState(movement?.householdId ?? defaultHousehold?.id ?? "");
+  const [sharedRows, setSharedRows] = useState<Record<number, boolean>>({0: movement?.isSharedWithHousehold ?? Boolean(defaultHousehold?.shareByDefault)});
+  const [selectedCategories, setSelectedCategories] = useState<Record<number, string>>({0: movement?.categoryId ?? ""});
+  function changeScope(row: number, shared: boolean) {
+    const previous = sharedRows[row] ? selectedHouseholdId : null;
+    const next = shared ? selectedHouseholdId : null;
+    setSelectedCategories((current) => ({...current, [row]: categoryAfterScopeChange(previous, next, current[row] ?? "")}));
+    setSharedRows((current) => ({...current, [row]: shared}));
+  }
   const containerValue = movement?.accountId ? `account:${movement.accountId}` : movement?.fundId ? `fund:${movement.fundId}` : containers[0]?.value;
   const isRequestForOtherMember = !movement && requestedForUserId !== "self";
   const canUseMultipleRows = !movement && !isRequestForOtherMember;
 
-  if (categories.length === 0 || (containers.length === 0 && requestRecipients.length === 0)) {
+  if (allCategories.length === 0 || (containers.length === 0 && requestRecipients.length === 0)) {
     return (
       <div className="space-y-3 rounded-md border border-border bg-white p-4">
         <p className="font-semibold">Servono dati di base</p>
@@ -93,15 +94,20 @@ export function MovementForm({
       <FormMessage state={state} />
       {movement?.id && <input type="hidden" name="id" value={movement.id} />}
       <input type="hidden" name="returnTo" value={returnTo} />
-      <input type="hidden" name="householdId" value={movement?.householdId ?? defaultHousehold?.id ?? ""} />
-      <input type="hidden" name="categoryOptions" value={JSON.stringify(categories)} />
+      <input type="hidden" name="householdId" value={selectedHouseholdId} />
+      <input type="hidden" name="categoryOptions" value={JSON.stringify(categoryOptionsForScope(categoryTree, selectedHouseholdId || null))} />
 
+      {households.length > 1 && !isRequestForOtherMember && <SelectField label="Famiglia" name="selectedHousehold" value={selectedHouseholdId} onChange={(event) => { setSelectedHouseholdId(event.target.value); setSelectedCategories({}); }} options={households.map((h) => ({value:h.id,label:h.name}))} />}
       {!movement && requestRecipients.length > 0 && (
         <SelectField
           label="Per conto di"
           name="requestedForUserId"
           value={requestedForUserId}
-          onChange={(event) => setRequestedForUserId(event.target.value)}
+          onChange={(event) => {
+            setRequestedForUserId(event.target.value);
+            if (event.target.value !== "self") setSelectedHouseholdId(defaultHousehold?.id ?? "");
+            setSelectedCategories({});
+          }}
           options={[
             { value: "self", label: "Me stesso" },
             ...requestRecipients.map((member) => ({ value: member.userId, label: member.fullName || member.username || "Membro" }))
@@ -112,6 +118,8 @@ export function MovementForm({
 
       {canUseMultipleRows && <input type="hidden" name="rowCount" value={rows.length} />}
       {(canUseMultipleRows ? rows : [0]).map((row, index) => {
+        const shared = isRequestForOtherMember || Boolean(sharedRows[row]);
+        const categories = categoryOptionsForScope(categoryTree, shared ? selectedHouseholdId : null);
         const prefix = canUseMultipleRows ? `rows[${index}].` : "";
         return (
           <fieldset key={row} className="space-y-4 rounded-md border border-border bg-white p-3">
@@ -128,7 +136,7 @@ export function MovementForm({
             )}
             <TextField label="Data" name={`${prefix}occurredOn`} type="date" defaultValue={movement?.occurredOn ?? today} errors={state.fieldErrors} />
             <TextField label="Descrizione" name={`${prefix}description`} defaultValue={movement?.description ?? ""} errors={state.fieldErrors} />
-            <SelectField label="Categoria" name={`${prefix}categoryId`} defaultValue={movement?.categoryId ?? categories[0]?.value} options={categories} errors={state.fieldErrors} />
+            <SelectField label="Categoria" name={`${prefix}categoryId`} value={selectedCategories[row] ?? ""} onChange={(event) => setSelectedCategories((current) => ({...current,[row]: event.target.value}))} required options={[{value:"",label:"Seleziona categoria"},...categories]} errors={state.fieldErrors} />
             <SelectField
               label="Tipo"
               name={`${prefix}type`}
@@ -162,9 +170,9 @@ export function MovementForm({
             )}
             {canUseMultipleRows && (
               <>
-                <input type="hidden" name={`${prefix}householdId`} value={defaultHousehold?.id ?? ""} />
+                <input type="hidden" name={`${prefix}householdId`} value={selectedHouseholdId} />
                 <label className="flex min-h-12 items-center gap-3 rounded-md border border-border bg-white px-3">
-                  <input name={`${prefix}sharedWithFamily`} type="checkbox" defaultChecked={Boolean(defaultHousehold?.shareByDefault)} className="h-5 w-5" />
+                  <input name={`${prefix}sharedWithFamily`} type="checkbox" checked={Boolean(sharedRows[row])} onChange={(event) => changeScope(row,event.target.checked)} className="h-5 w-5" />
                   <span className="text-sm font-semibold">Condividi con famiglia</span>
                 </label>
               </>
@@ -193,7 +201,8 @@ export function MovementForm({
           <input
             name="sharedWithFamily"
             type="checkbox"
-            defaultChecked={movement?.isSharedWithHousehold ?? Boolean(defaultHousehold?.shareByDefault)}
+            checked={Boolean(sharedRows[0])}
+            onChange={(event) => changeScope(0,event.target.checked)}
             className="h-5 w-5"
           />
           <span className="text-sm font-semibold">Condividi con famiglia</span>

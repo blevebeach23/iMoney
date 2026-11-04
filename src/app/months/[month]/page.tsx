@@ -1,3 +1,4 @@
+import { personalViewMovements } from "@/lib/movements/view-scope";
 import { synchronizeFinancialAutomation } from "@/services/automation/financial-automation-service";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -26,10 +27,11 @@ export default async function MonthDetailPage({ params }: Readonly<{ params: { m
   await synchronizeFinancialAutomation(supabase, user.id);
 
   const range = monthRangeFromYearMonth(params.month);
-  const [movements, categoryInfo] = await Promise.all([
+  const [allMovements, categoryInfo] = await Promise.all([
     getMonthlyMovements(supabase, user.id, range.monthStart, range.monthEnd),
     getMovementCategoryInfo(supabase, user.id)
   ]);
+  const movements = personalViewMovements(allMovements);
   const summary = calculateMonthlySummary(movements);
   const aggregates = calculateCategoryAggregates(movements, categoryInfo);
 

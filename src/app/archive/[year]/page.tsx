@@ -1,3 +1,4 @@
+import { personalViewMovements } from "@/lib/movements/view-scope";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { calculateCategoryAggregates } from "@/lib/calculations/category-aggregates";
@@ -23,10 +24,11 @@ export default async function ArchiveYearPage({ params }: Readonly<{ params: { y
     redirect("/login");
   }
 
-  const [movements, categoryInfo] = await Promise.all([
+  const [allMovements, categoryInfo] = await Promise.all([
     getMovementsBetween(supabase, user.id, `${year}-01-01`, `${year}-12-31`),
     getMovementCategoryInfo(supabase, user.id)
   ]);
+  const movements = personalViewMovements(allMovements);
   const summary = calculateMonthlySummary(movements);
   const monthly = calculateMonthlyStatistics(movements, year);
   const aggregates = calculateCategoryAggregates(movements, categoryInfo);

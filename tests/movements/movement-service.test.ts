@@ -150,7 +150,8 @@ function queryMock() {
     gte: vi.fn(() => query),
     is: vi.fn(() => query),
     lte: vi.fn(() => query),
-    order: vi.fn(() => query)
+    order: vi.fn(() => query),
+    range: vi.fn(() => query)
   };
 
   return query;

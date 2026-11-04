@@ -224,6 +224,17 @@ export async function resolveCreatedImportCategories(
   rows: ImportMovementInput[],
   macroCategoryIdForNew: string | undefined
 ): Promise<ImportMovementInput[]> {
+  const scopes = new Set(rows.map(row=>row.sharedWithFamily ? row.householdId : null));
+  if(scopes.size>1) {
+    const result = [...rows];
+    for(const scope of scopes) {
+      const indices=rows.flatMap((row,index)=>(row.sharedWithFamily?row.householdId:null)===scope ? [index] : []);
+      const resolved=await resolveCreatedImportCategories(supabase,userId,indices.map(index=>rows[index]),macroCategoryIdForNew);
+      indices.forEach((index,position)=>{ result[index]=resolved[position]; });
+    }
+    return result;
+  }
+  const householdId = rows[0]?.sharedWithFamily ? rows[0].householdId ?? undefined : undefined;
   const newNamesByNormalizedName = new Map<string, string>();
   for (const row of rows) {
     const name = row.createCategoryName?.trim();
@@ -237,7 +248,12 @@ export async function resolveCreatedImportCategories(
     return rows;
   }
 
-  const targetMacroCategoryId = macroCategoryIdForNew ?? await ensureImportOtherMacroCategory(supabase, userId);
+  const targetMacroCategoryId = macroCategoryIdForNew ?? await ensureImportOtherMacroCategory(supabase, userId, householdId);
+  if (macroCategoryIdForNew) {
+    const {data: parent,error: parentError}=await supabase.from("macro_categories").select("owner_user_id, household_id").eq("id",targetMacroCategoryId).single();
+    if(parentError) throw parentError;
+    if(!parent || (householdId ? parent.household_id!==householdId || parent.owner_user_id!==null : parent.owner_user_id!==userId || parent.household_id!==null)) throw new Error("Macro-categoria import nel bilancio errato");
+  }
   const categoryIdByName = await getCategoryIdsByNormalizedName(supabase, targetMacroCategoryId);
   const namesToCreate = newNames.filter((name) => !categoryIdByName.has(normalizeText(name)));
 
@@ -274,15 +290,15 @@ export async function resolveCreatedImportCategories(
   });
 }
 
-export async function ensureImportOtherMacroCategory(supabase: SupabaseClient, userId: string): Promise<string> {
-  const existingMacroId = await findImportOtherMacroCategoryId(supabase, userId);
+export async function ensureImportOtherMacroCategory(supabase: SupabaseClient, userId: string, householdId?: string): Promise<string> {
+  const existingMacroId = await findImportOtherMacroCategoryId(supabase, userId, householdId);
   if (existingMacroId) {
     return existingMacroId;
   }
 
   const { data, error } = await supabase
     .from("macro_categories")
-    .insert({ owner_user_id: userId, name: "Altro", sort_order: 1000 })
+    .insert({ owner_user_id: householdId ? null : userId, household_id: householdId ?? null, name: "Altro", sort_order: 1000 })
     .select("id")
     .single();
 
@@ -290,7 +306,7 @@ export async function ensureImportOtherMacroCategory(supabase: SupabaseClient, u
     return String((data as Row).id);
   }
 
-  const macroIdAfterConflict = await findImportOtherMacroCategoryId(supabase, userId);
+  const macroIdAfterConflict = await findImportOtherMacroCategoryId(supabase, userId, householdId);
   if (macroIdAfterConflict) {
     return macroIdAfterConflict;
   }
@@ -298,11 +314,11 @@ export async function ensureImportOtherMacroCategory(supabase: SupabaseClient, u
   throw error ?? new Error("Macro-categoria Altro non disponibile");
 }
 
-async function findImportOtherMacroCategoryId(supabase: SupabaseClient, userId: string): Promise<string | null> {
+async function findImportOtherMacroCategoryId(supabase: SupabaseClient, userId: string, householdId?: string): Promise<string | null> {
   const { data, error } = await supabase
     .from("macro_categories")
     .select("id, name")
-    .eq("owner_user_id", userId)
+    .eq(householdId ? "household_id" : "owner_user_id", householdId ?? userId)
     .is("deleted_at", null);
 
   if (error) {

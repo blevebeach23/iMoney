@@ -6,18 +6,7 @@ export const initialAccountOptions = [
   { key: "credit_card", label: "Carta di credito", type: "credit_card" }
 ] as const;
 
-export const initialCategoryGroups = [
-  { macro: "CASA", categories: ["Affitto", "Mutuo", "Manutenzione"] },
-  { macro: "ALIMENTARI", categories: ["Supermercato", "Pranzo", "Spesa casa"] },
-  { macro: "AUTO", categories: ["Carburante", "Assicurazione", "Manutenzione"] },
-  { macro: "ISTRUZIONE", categories: ["Scuola", "Libri", "Corsi"] },
-  { macro: "UTENZE", categories: ["Luce", "Gas", "Telefono"] },
-  { macro: "TASSE", categories: ["Imposte", "Bolli"] },
-  { macro: "SALUTE", categories: ["Farmacia", "Visite"] },
-  { macro: "TEMPO LIBERO", categories: ["Ristoranti", "Sport", "Cultura"] },
-  { macro: "VACANZE", categories: ["Viaggi", "Alloggi"] },
-  { macro: "ALTRO", categories: ["Varie"] }
-] as const;
+export { defaultCategoryGroups as initialCategoryGroups } from "@/lib/categories/default-taxonomy";
 
 export const onboardingSchema = z.object({
   fullName: z.string().trim().min(1, "Nome obbligatorio"),

@@ -1,3 +1,6 @@
+import Link from "next/link";
+import { BalanceRefresh } from "@/components/dashboard/balance-refresh";
+import { personalViewMovements } from "@/lib/movements/view-scope";
 import { buildLiquidityForecastEvents, calculateLiquiditySummary } from "@/lib/calculations/liquidity";
 import { synchronizeFinancialAutomation } from "@/services/automation/financial-automation-service";
 import { DashboardPreview } from "@/components/dashboard/dashboard-preview";
@@ -49,6 +52,7 @@ export default async function Home({ searchParams }: Readonly<{ searchParams: Re
 
   const range = monthRangeFromYearMonth(firstParam(searchParams.month) ?? todayInRome().slice(0, 7));
   const year = Number(range.yearMonth.slice(0, 4));
+  const includeShared = firstParam(searchParams.includeShared) === "1";
   const [accounts, budgets, funds, monthMovements, movementsUntilMonthEnd, yearMovements, transfersUntilMonthEnd, categoryInfo, creditCardSettings, creditCardSettlementHistory] = await Promise.all([
     getAccounts(supabase, user.id),
     getPersonalBudgetsForMonth(supabase, user.id, range.monthStart),
@@ -57,11 +61,12 @@ export default async function Home({ searchParams }: Readonly<{ searchParams: Re
     getMovementsUntil(supabase, user.id, range.monthEnd > range.today ? range.monthEnd : range.today),
     getMovementsBetween(supabase, user.id, `${year}-01-01`, `${year}-12-31`),
     getTransfersUntil(supabase, user.id, range.monthEnd > range.today ? range.monthEnd : range.today),
-    getMovementCategoryInfo(supabase, user.id),
+    getMovementCategoryInfo(supabase, user.id, { includeHouseholds: includeShared }),
     getCreditCardSettingsForUser(supabase, user.id),
     getCreditCardSettlementHistoryForUser(supabase, user.id)
   ]);
-  const summary = calculateMonthlySummary(monthMovements);
+  const visibleMonthMovements = personalViewMovements(monthMovements, includeShared);
+  const summary = calculateMonthlySummary(visibleMonthMovements);
   const currentBalances = calculateFinancialBalances(accounts, funds, movementsUntilMonthEnd, transfersUntilMonthEnd, range.today, range.today);
   const creditCardForecasts = getCreditCardForecasts({
     accounts,
@@ -74,20 +79,23 @@ export default async function Home({ searchParams }: Readonly<{ searchParams: Re
   });
   const virtualSettlementTransfers = buildVirtualCreditCardSettlementTransfers(user.id, creditCardForecasts, creditCardSettlementHistory).filter((transfer) => transfer.occurredOn > range.today && transfer.occurredOn <= range.monthEnd);
   const balances = calculateFinancialBalances(accounts, funds, movementsUntilMonthEnd, [...transfersUntilMonthEnd, ...virtualSettlementTransfers], range.today, range.monthEnd);
-  const budgetReport = calculateBudgetReport(budgets, monthMovements, categoryInfo);
-  const categoryAggregates = calculateCategoryAggregates(monthMovements, categoryInfo);
-  const upcomingMovements = getUpcomingMovements(monthMovements, range.today);
-  const annualTrend = calculateAnnualTrend(yearMovements, year);
+  const budgetReport = calculateBudgetReport(budgets, personalViewMovements(monthMovements), categoryInfo);
+  const categoryAggregates = calculateCategoryAggregates(visibleMonthMovements, categoryInfo);
+  const upcomingMovements = getUpcomingMovements(visibleMonthMovements, range.today);
+  const annualTrend = calculateAnnualTrend(personalViewMovements(yearMovements, includeShared), year);
   const userName = shortUserName(profile?.full_name, profile?.username);
 
   return (
     <>
+      <BalanceRefresh />
       <form action={logoutAction} className="mx-auto max-w-md px-4 pt-4">
         <button type="submit" className="text-sm font-semibold text-primary">
           Esci
         </button>
       </form>
+      <div className="mx-auto max-w-md px-4 pt-3"><Link href={`/?month=${range.yearMonth}${includeShared ? "" : "&includeShared=1"}`} className="flex min-h-11 items-center justify-center rounded-md border border-border px-3 text-sm font-semibold">{includeShared ? "Mostra solo i miei movimenti personali" : "Includi i miei movimenti condivisi"}</Link><p className="mt-2 text-xs text-zinc-600">I saldi dei conti includono sempre tutta la tua storia contabile. Il budget personale include soltanto movimenti non condivisi.</p></div>
       <DashboardPreview
+        includeShared={includeShared}
         liquidity={calculateLiquiditySummary(accounts, balances)}
         liquidityEvents={buildLiquidityForecastEvents(accounts, movementsUntilMonthEnd, [...transfersUntilMonthEnd, ...virtualSettlementTransfers], range.today, range.monthEnd)}
         annualTrend={annualTrend}

@@ -69,11 +69,11 @@ export function calculateCreditCardExposure(account: Account, movements: Movemen
 
 function accountBalance(account: Account, movements: Movement[], transfers: Transfer[], cutoffDate: string): BalanceSnapshot {
   const balance = movements
-    .filter((movement) => movement.accountId === account.id && movement.occurredOn <= cutoffDate)
-    .reduce((total, movement) => total.plus(accountMovementEffect(account, movement)), toDecimal(account.openingBalance));
+    .filter((movement) => movement.deletedAt === null && movement.accountId === account.id && movement.occurredOn <= cutoffDate)
+    .reduce((total, movement) => total.plus(accountMovementEffect(account, movement)), openingBalanceAt(account, cutoffDate));
 
   const withTransfers = transfers
-    .filter((transfer) => transfer.occurredOn <= cutoffDate)
+    .filter((transfer) => transfer.deletedAt === null && transfer.occurredOn <= cutoffDate)
     .reduce((total, transfer) => total.plus(accountTransferEffect(account.id, transfer)), balance);
 
   return {
@@ -85,11 +85,11 @@ function accountBalance(account: Account, movements: Movement[], transfers: Tran
 
 function fundBalance(fund: Fund, movements: Movement[], transfers: Transfer[], cutoffDate: string): BalanceSnapshot {
   const balance = movements
-    .filter((movement) => movement.fundId === fund.id && movement.occurredOn <= cutoffDate)
-    .reduce((total, movement) => total.plus(financialMovementEffect(movement)), toDecimal(fund.openingBalance));
+    .filter((movement) => movement.deletedAt === null && movement.fundId === fund.id && movement.occurredOn <= cutoffDate)
+    .reduce((total, movement) => total.plus(financialMovementEffect(movement)), openingBalanceAt(fund, cutoffDate));
 
   const withTransfers = transfers
-    .filter((transfer) => transfer.occurredOn <= cutoffDate)
+    .filter((transfer) => transfer.deletedAt === null && transfer.occurredOn <= cutoffDate)
     .reduce((total, transfer) => total.plus(fundTransferEffect(fund.id, transfer)), balance);
 
   return {
@@ -101,11 +101,11 @@ function fundBalance(fund: Fund, movements: Movement[], transfers: Transfer[], c
 
 function creditCardDue(account: Account, movements: Movement[], transfers: Transfer[], cutoffDate: string): CreditCardDue {
   const spent = movements
-    .filter((movement) => movement.accountId === account.id && movement.occurredOn <= cutoffDate)
-    .reduce((total, movement) => total.plus(creditCardMovementEffect(movement)), toDecimal(account.openingBalance));
+    .filter((movement) => movement.deletedAt === null && movement.accountId === account.id && movement.occurredOn <= cutoffDate)
+    .reduce((total, movement) => total.plus(creditCardMovementEffect(movement)), openingBalanceAt(account, cutoffDate));
 
   const settled = transfers
-    .filter((transfer) => transfer.occurredOn <= cutoffDate)
+    .filter((transfer) => transfer.deletedAt === null && transfer.occurredOn <= cutoffDate)
     .reduce((total, transfer) => total.plus(creditCardTransferEffect(account.id, transfer)), toDecimal(0));
 
   return {
@@ -115,6 +115,10 @@ function creditCardDue(account: Account, movements: Movement[], transfers: Trans
     settled: formatMoney(settled.abs()),
     due: formatMoney(spent.plus(settled))
   };
+}
+
+function openingBalanceAt(container: Account | Fund, cutoffDate: string) {
+  return toDecimal(container.openingBalanceDate && container.openingBalanceDate > cutoffDate ? 0 : container.openingBalance);
 }
 
 function accountMovementEffect(account: Account, movement: Movement) {

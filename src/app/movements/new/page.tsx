@@ -21,7 +21,7 @@ export default async function NewMovementPage() {
   const [accounts, funds, categoryTree, households] = await Promise.all([
     getAccounts(supabase, user.id),
     getFunds(supabase, user.id),
-    getCategoryTree(supabase, user.id),
+    getCategoryTree(supabase, user.id, { includeHouseholds: true }),
     getActiveHouseholdOptions(supabase, user.id)
   ]);
   const requestRecipients = households[0]

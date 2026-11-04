@@ -73,6 +73,7 @@ export async function saveAccountAction(_prevState: FormState, formData: FormDat
     }
     await rebuildBalanceCaches(supabase, user.id);
     revalidatePath("/accounts");
+    revalidatePath("/");
     return { ok: true, message: "Conto salvato" };
   } catch (error) {
     return { ok: false, message: messageFromError(error) };
@@ -85,6 +86,7 @@ export async function deactivateAccountAction(formData: FormData) {
   await deactivateAccount(supabase, user.id, accountId);
   await rebuildBalanceCaches(supabase, user.id);
   revalidatePath("/accounts");
+  revalidatePath("/");
 }
 
 export async function saveCreditCardSettingsAction(_prevState: FormState, formData: FormData): Promise<FormState> {
@@ -140,6 +142,7 @@ export async function saveFundAction(_prevState: FormState, formData: FormData):
     await rebuildBalanceCaches(supabase, user.id);
     revalidatePath("/funds");
     revalidatePath("/family");
+    revalidatePath("/");
     return { ok: true, message: "Fondo salvato" };
   } catch (error) {
     return { ok: false, message: messageFromError(error) };
@@ -153,6 +156,7 @@ export async function deactivateFundAction(formData: FormData) {
   await rebuildBalanceCaches(supabase, user.id);
   revalidatePath("/funds");
   revalidatePath("/family");
+  revalidatePath("/");
 }
 
 export async function saveMacroCategoryAction(_prevState: FormState, formData: FormData): Promise<FormState> {
@@ -165,9 +169,9 @@ export async function saveMacroCategoryAction(_prevState: FormState, formData: F
   try {
     const { supabase, user } = await requireUser();
     if (parsed.data.id) {
-      await updateMacroCategory(supabase, user.id, { ...parsed.data, id: parsed.data.id });
+      await updateMacroCategory(supabase, user.id, { ...parsed.data, id: parsed.data.id }, parsed.data.householdId ?? undefined);
     } else {
-      await createMacroCategory(supabase, user.id, parsed.data);
+      await createMacroCategory(supabase, user.id, parsed.data, parsed.data.householdId ?? undefined);
     }
     revalidatePath("/settings/categories");
     return { ok: true, message: "Macro-categoria salvata" };
@@ -179,7 +183,8 @@ export async function saveMacroCategoryAction(_prevState: FormState, formData: F
 export async function deactivateMacroCategoryAction(formData: FormData) {
   const macroCategoryId = String(formData.get("id") ?? "");
   const { supabase, user } = await requireUser();
-  await deactivateMacroCategory(supabase, user.id, macroCategoryId);
+  const householdId = macroCategoryFormSchema.shape.householdId.parse(formData.get("householdId") ?? "");
+  await deactivateMacroCategory(supabase, user.id, macroCategoryId, householdId ?? undefined);
   revalidatePath("/settings/categories");
 }
 
@@ -235,4 +240,11 @@ export async function deleteCategoryAction(_prevState: FormState, formData: Form
   } catch (error) {
     return { ok: false, message: messageFromError(error) };
   }
+}
+
+export async function initializePersonalCategoriesAction() {
+  const { supabase } = await requireUser();
+  const { error } = await supabase.rpc("initialize_personal_categories");
+  if (error) throw error;
+  revalidatePath("/settings/categories");
 }

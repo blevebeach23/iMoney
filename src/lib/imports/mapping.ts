@@ -95,22 +95,33 @@ export function inferInitialColumns(headers: string[]): Partial<Record<ImportCol
   return result;
 }
 
+export type ScopedImportCategory = Category & { householdId?: string | null };
+
 export function buildImportPreview(input: {
   rows: Array<Record<string, string>>;
   mapping: ImportMapping;
-  categories: Category[];
+  categories: ScopedImportCategory[];
   accounts: Account[];
   funds: Fund[];
   existingMovements: Movement[];
 }): ImportPreview {
-  const categoriesByName = new Map(input.categories.map((category) => [normalizeText(category.name), category]));
-  const categoryById = new Map(input.categories.map((category) => [category.id, category]));
+
   const savedContainerMappings = input.mapping.accountMappings ?? {};
   const duplicateKeys = new Set(input.existingMovements.map((movement) => duplicateKey(movement)));
   const accountMappingRequests = new Map<string, AccountMappingRequest>();
-  const previewRows = input.rows.map((row, index) =>
-    mapImportRow(row, index + 2, input.mapping, input.accounts, input.funds, categoriesByName, categoryById, duplicateKeys, accountMappingRequests, savedContainerMappings)
-  );
+  const previewRows = input.rows.map((row, index) => {
+    const shared = booleanFromCsv(readMapped(row,input.mapping.columns.shared),input.mapping.defaults.sharedWithFamily);
+    const household = shared ? input.mapping.defaults.householdId : null;
+    const scoped = input.categories.filter(c=>c.householdId === undefined || c.householdId === household);
+    const categoriesByName = new Map<string,Category>();
+    const ambiguous = new Set<string>();
+    for (const c of scoped) { const name=normalizeText(c.name); if(categoriesByName.has(name)) ambiguous.add(name); else categoriesByName.set(name,c); }
+    for(const name of ambiguous) categoriesByName.delete(name);
+    const result=mapImportRow(row,index+2,input.mapping,input.accounts,input.funds,categoriesByName,new Map(scoped.map(c=>[c.id,c])),duplicateKeys,accountMappingRequests,savedContainerMappings);
+    const rawName=normalizeText(readMapped(row,input.mapping.columns.category));
+    if(ambiguous.has(rawName) && input.mapping.missingCategoryStrategy!=="default") { result.errors.push("Categoria omonima in più macro: seleziona una categoria default esplicita o rinomina il valore CSV");result.valid=false;result.movement=null; }
+    return result;
+  });
 
   return {
     rows: previewRows,
@@ -199,7 +210,7 @@ function mapImportRow(
   const type = amount ? inferMovementType(rawType || mapping.defaults.type, amount.sign) : mapping.defaults.type;
   const categoryValue = readMapped(row, mapping.columns.category);
   const category = categoryValue ? categoriesByName.get(normalizeText(categoryValue)) : categoryById.get(mapping.defaults.categoryId);
-  let categoryId = category?.id ?? mapping.defaults.categoryId;
+  let categoryId = category?.id ?? categoryById.get(mapping.defaults.categoryId)?.id ?? "";
   let categoryName = category?.name ?? "Categoria";
   let createCategoryName: string | undefined;
   let skipped = false;

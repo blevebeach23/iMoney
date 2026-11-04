@@ -24,7 +24,7 @@ export default async function ImportPage() {
     getAccounts(supabase, user.id),
     getImportAccountMappings(supabase, user.id),
     getImportBatches(supabase, user.id),
-    getCategoryTree(supabase, user.id),
+    getCategoryTree(supabase, user.id, { includeHouseholds: true }),
     getMovements(supabase, user.id),
     getFunds(supabase, user.id),
     getActiveHouseholdOptions(supabase, user.id)

@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { initialAccountOptions, initialCategoryGroups, onboardingSchema } from "@/lib/onboarding/initial-data";
+import { initialAccountOptions, onboardingSchema } from "@/lib/onboarding/initial-data";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { FormState } from "@/lib/auth/validation";
 import { toFieldErrors } from "@/lib/auth/validation";
@@ -88,33 +88,8 @@ export async function completeOnboardingAction(_prevState: FormState, formData: 
   }
 
   if (parsed.data.createInitialCategories) {
-    for (const [index, group] of initialCategoryGroups.entries()) {
-      const macro = await supabase
-        .from("macro_categories")
-        .insert({
-          owner_user_id: user.id,
-          name: group.macro,
-          sort_order: index
-        })
-        .select("id")
-        .single();
-
-      if (macro.error) {
-        return { ok: false, message: macro.error.message };
-      }
-
-      const { error } = await supabase.from("categories").insert(
-        group.categories.map((category, categoryIndex) => ({
-          macro_category_id: macro.data.id,
-          name: category,
-          sort_order: categoryIndex
-        }))
-      );
-
-      if (error) {
-        return { ok: false, message: error.message };
-      }
-    }
+    const { error } = await supabase.rpc("initialize_personal_categories");
+    if (error) return { ok: false, message: error.message };
   }
 
   const completion = await supabase

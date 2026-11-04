@@ -1,3 +1,4 @@
+import { readAllPages } from "@/services/read-all-pages";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Movement } from "@/types/domain";
 import type { MovementCategoryInfo } from "@/lib/calculations/category-aggregates";
@@ -89,7 +90,7 @@ export async function getMonthlyMovements(
   monthStart: string,
   monthEnd: string
 ): Promise<Movement[]> {
-  const { data, error } = await supabase
+  const data = await readAllPages<MovementRow>((from, to) => supabase
     .from("movements")
     .select("*")
     .eq("owner_user_id", userId)
@@ -97,11 +98,9 @@ export async function getMonthlyMovements(
     .gte("occurred_on", monthStart)
     .lte("occurred_on", monthEnd)
     .order("occurred_on", { ascending: false })
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    throw error;
-  }
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .range(from, to));
 
   return (data ?? []).map(mapMovementRow);
 }
@@ -112,7 +111,7 @@ export async function getMovementsBetween(
   startDate: string,
   endDate: string
 ): Promise<Movement[]> {
-  const { data, error } = await supabase
+  const data = await readAllPages<MovementRow>((from, to) => supabase
     .from("movements")
     .select("*")
     .eq("owner_user_id", userId)
@@ -120,11 +119,9 @@ export async function getMovementsBetween(
     .gte("occurred_on", startDate)
     .lte("occurred_on", endDate)
     .order("occurred_on", { ascending: false })
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    throw error;
-  }
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .range(from, to));
 
   return (data ?? []).map(mapMovementRow);
 }
@@ -182,35 +179,31 @@ export async function getSharedHouseholdMovementsBetween(
 }
 
 export async function getMovementsUntil(supabase: SupabaseClient, userId: string, cutoffDate: string): Promise<Movement[]> {
-  const { data, error } = await supabase
+  const data = await readAllPages<MovementRow>((from, to) => supabase
     .from("movements")
     .select("*")
     .eq("owner_user_id", userId)
     .is("deleted_at", null)
     .lte("occurred_on", cutoffDate)
     .order("occurred_on", { ascending: false })
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    throw error;
-  }
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .range(from, to));
 
   return (data ?? []).map(mapMovementRow);
 }
 
 export async function getMovementCategoryInfo(
   supabase: SupabaseClient,
-  userId: string
+  userId: string,
+  scope: { householdId?: string; includeHouseholds?: boolean } = {}
 ): Promise<Map<string, MovementCategoryInfo>> {
-  const { data, error } = await supabase
-    .from("macro_categories")
-    .select("id, name, categories(id, name)")
-    .eq("owner_user_id", userId)
-    .is("deleted_at", null);
-
-  if (error) {
-    throw error;
-  }
+  let query = supabase.from("macro_categories").select("id, name, categories(id, name)");
+  if (scope.householdId) query = query.eq("household_id", scope.householdId);
+  else if (scope.includeHouseholds) query = query.or(`owner_user_id.eq.${userId},household_id.not.is.null`);
+  else query = query.eq("owner_user_id", userId);
+  const { data, error } = await query;
+  if (error) throw error;
 
   const map = new Map<string, MovementCategoryInfo>();
 

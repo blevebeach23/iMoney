@@ -45,6 +45,10 @@ function categorySupabase(input: { counts: Record<string, number> }) {
   ];
 
   return {
+    rpc: vi.fn(async (_name: string, args: { target_category_ids: string[]; target_macro_ids: string[] }) => ({ data: [
+      ...args.target_category_ids.map(id=>({kind:"category",id,reasons:[...["movements:category_id:"+id].filter(k=>input.counts[k]).map(()=>"movimenti")]})),
+      ...args.target_macro_ids.map(id=>({kind:"macro",id,reasons:[...(input.counts["categories:macro_category_id:"+id]?["categorie figlie"]:[]),...(input.counts["budgets:macro_category_id:"+id]?["budget"]:[])]}))
+    ], error:null })),
     from: vi.fn((table: string) => ({
       select: vi.fn((_columns?: string, options?: { count?: string; head?: boolean }) => {
         if (options?.head) {

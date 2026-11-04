@@ -58,8 +58,8 @@ export default async function FamilySettingsPage({ searchParams }: Readonly<{ se
     getHouseholdInvites(supabase, selectedHouseholdId),
     getHouseholdPreference(supabase, selectedHouseholdId, user.id),
     getHouseholdBudgetsForMonth(supabase, selectedHouseholdId, range.monthStart),
-    getCategoryTree(supabase, user.id),
-    getMovementCategoryInfo(supabase, user.id),
+    getCategoryTree(supabase, user.id, { householdId: selectedHouseholdId }),
+    getMovementCategoryInfo(supabase, user.id, { householdId: selectedHouseholdId }),
     getSharedHouseholdMovements(supabase, selectedHouseholdId, range.monthStart, range.monthEnd)
   ]);
 

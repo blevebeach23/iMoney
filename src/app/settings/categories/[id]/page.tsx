@@ -15,14 +15,14 @@ export default async function MacroCategoryDetailPage({ params, searchParams }: 
     redirect("/login");
   }
 
-  const categoryTree = await getCategoryTree(supabase, user.id);
+  const categoryTree = await getCategoryTree(supabase, user.id, { includeHouseholds: true });
   const macro = categoryTree.find((item) => item.id === params.id);
 
   if (!macro) {
     notFound();
   }
 
-  const period = searchParams.month ? `?period=${searchParams.month}&macroCategoryId=${macro.id}` : `?macroCategoryId=${macro.id}`;
+  const period = searchParams.month ? `?period=${searchParams.month}&macroCategoryId=${macro.id}` : `?macroCategoryId=${macro.id}${macro.householdId ? "&shared=yes" : ""}`;
 
   return (
     <main className="mx-auto min-h-dvh max-w-md px-4 pb-24 pt-6">
@@ -37,7 +37,7 @@ export default async function MacroCategoryDetailPage({ params, searchParams }: 
         {macro.categories.map((category) => (
           <Link
             key={category.id}
-            href={`/movements?categoryId=${category.id}${searchParams.month ? `&period=${searchParams.month}` : ""}`}
+            href={`/movements?categoryId=${category.id}${macro.householdId ? "&shared=yes" : ""}${searchParams.month ? `&period=${searchParams.month}` : ""}`}
             className="flex min-h-14 items-center justify-between rounded-md border border-border bg-white px-4 shadow-panel"
           >
             <span className="font-medium">{category.name}</span>

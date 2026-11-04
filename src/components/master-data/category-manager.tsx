@@ -18,12 +18,13 @@ import { FormMessage, PendingButton, SelectField, TextField } from "./field-cont
 
 const initialState: FormState = { ok: false };
 
-function MacroCategoryForm({ macro }: Readonly<{ macro?: CategoryTreeItem }>) {
+function MacroCategoryForm({ macro, householdId }: Readonly<{ macro?: CategoryTreeItem; householdId?: string }>) {
   const [state, action] = useFormState(saveMacroCategoryAction, initialState);
 
   return (
     <form action={action} className="space-y-3">
       <FormMessage state={state} />
+      <input type="hidden" name="householdId" value={householdId ?? ""} />
       {macro?.id && <input type="hidden" name="id" value={macro.id} />}
       <TextField label="Nome macro-categoria" name="name" defaultValue={macro?.name ?? ""} errors={state.fieldErrors} />
       <TextField label="Ordine" name="sortOrder" type="number" min={0} defaultValue={macro?.sortOrder ?? 0} errors={state.fieldErrors} />
@@ -98,9 +99,10 @@ function BlockedDeleteNote({ reasons }: Readonly<{ reasons: string[] }>) {
   return <p className="text-xs leading-5 text-zinc-500">Eliminazione definitiva bloccata: {reasons.join(", ")}.</p>;
 }
 
-export function CategoryManager({ categoryTree }: Readonly<{ categoryTree: CategoryTreeItem[] }>) {
+export function CategoryManager({ categoryTree, householdId, canManage = true }: Readonly<{ categoryTree: CategoryTreeItem[]; householdId?: string; canManage?: boolean }>) {
   const activeMacroCategories = categoryTree.filter((macro) => macro.deletedAt === null);
 
+  if (!canManage) return <div className="space-y-3"><p className="text-sm text-zinc-600">Categorie disponibili a tutti i membri. La gestione è riservata agli amministratori.</p>{activeMacroCategories.map((macro) => <section key={macro.id}><h2 className="font-bold">{macro.name}</h2><ul>{macro.categories.filter(c=>!c.deletedAt).map(c=><li key={c.id}>{c.name}</li>)}</ul></section>)}</div>;
   return (
     <div className="space-y-4">
       <details className="rounded-md border border-border bg-white p-4" open={categoryTree.length === 0}>
@@ -109,7 +111,7 @@ export function CategoryManager({ categoryTree }: Readonly<{ categoryTree: Categ
           Nuova macro-categoria
         </summary>
         <div className="mt-4">
-          <MacroCategoryForm />
+          <MacroCategoryForm householdId={householdId} />
         </div>
       </details>
 
@@ -127,7 +129,7 @@ export function CategoryManager({ categoryTree }: Readonly<{ categoryTree: Categ
 
       {categoryTree.length === 0 ? (
         <div className="rounded-md border border-dashed border-border bg-white p-5">
-          <p className="font-semibold text-foreground">Nessuna categoria personale</p>
+          <p className="font-semibold text-foreground">Nessuna categoria in questo bilancio</p>
           <p className="mt-2 text-sm leading-6 text-zinc-600">Crea una macro-categoria, poi aggiungi le categorie figlie.</p>
         </div>
       ) : (
@@ -206,7 +208,7 @@ export function CategoryManager({ categoryTree }: Readonly<{ categoryTree: Categ
                 <details className="rounded-md border border-border p-3">
                   <summary className="cursor-pointer list-none text-sm font-semibold">Modifica macro-categoria</summary>
                   <div className="mt-4">
-                    <MacroCategoryForm macro={macro} />
+                    <MacroCategoryForm macro={macro} householdId={householdId} />
                   </div>
                 </details>
               )}

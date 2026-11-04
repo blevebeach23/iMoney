@@ -22,7 +22,7 @@ export default async function EditFixedExpensePage({ params }: Readonly<{ params
   const [accounts, funds, categoryTree, households, fixedExpense] = await Promise.all([
     getAccounts(supabase, user.id),
     getFunds(supabase, user.id),
-    getCategoryTree(supabase, user.id),
+    getCategoryTree(supabase, user.id, { includeHouseholds: true }),
     getActiveHouseholdOptions(supabase, user.id),
     getFixedExpenseById(supabase, user.id, params.id)
   ]);

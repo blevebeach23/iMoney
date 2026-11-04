@@ -1,3 +1,4 @@
+import { personalViewMovements } from "@/lib/movements/view-scope";
 import { notFound, redirect } from "next/navigation";
 import { BudgetManager } from "@/components/budgets/budget-manager";
 import { calculateBudgetReport } from "@/lib/calculations/budget";
@@ -22,12 +23,13 @@ export async function BudgetMonthContent({ yearMonth }: Readonly<{ yearMonth: st
   }
 
   const range = monthRangeFromYearMonth(yearMonth);
-  const [budgets, categoryTree, categoryInfo, movements] = await Promise.all([
+  const [budgets, categoryTree, categoryInfo, allMovements] = await Promise.all([
     getPersonalBudgetsForMonth(supabase, user.id, range.monthStart),
     getCategoryTree(supabase, user.id),
     getMovementCategoryInfo(supabase, user.id),
     getMonthlyMovements(supabase, user.id, range.monthStart, range.monthEnd)
   ]);
+  const movements = personalViewMovements(allMovements);
   const report = calculateBudgetReport(budgets, movements, categoryInfo);
 
   return (

@@ -59,6 +59,7 @@ export const fundFormSchema = z.object({
 });
 
 export const macroCategoryFormSchema = z.object({
+  householdId: z.preprocess((value) => value === "" || value === undefined ? null : value, z.string().uuid().nullable()).optional(),
   id: z.string().uuid().optional(),
   name: z.string().trim().min(1, "Nome obbligatorio").max(80, "Nome troppo lungo"),
   sortOrder: z.coerce.number().int().min(0, "Ordine non valido")

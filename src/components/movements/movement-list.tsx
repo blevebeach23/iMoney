@@ -1,4 +1,5 @@
 "use client";
+import { categoryOptionsForScope } from "@/lib/categories/scope";
 
 import Link from "next/link";
 import { ArrowRightLeft, Copy, Plus, Share2, Trash2 } from "lucide-react";
@@ -39,7 +40,7 @@ function categoryOptions(categoryTree: CategoryTreeItem[]) {
   return categoryTree.flatMap((macro) =>
     macro.categories.map((category) => ({
       value: category.id,
-      label: `${macro.name} / ${category.name}`
+      label: `${macro.householdId ? "Famiglia" : "Personale"} / ${macro.name} / ${category.name}`
     }))
   );
 }
@@ -76,7 +77,7 @@ export function MovementFiltersForm({
         <option value="">Tutte le macro-categorie</option>
         {categoryTree.map((macro) => (
           <option key={macro.id} value={macro.id}>
-            {macro.name}
+            {macro.householdId ? "Famiglia" : "Personale"} / {macro.name}
           </option>
         ))}
       </select>
@@ -85,7 +86,7 @@ export function MovementFiltersForm({
         {categoryTree.flatMap((macro) =>
           macro.categories.map((category) => (
             <option key={category.id} value={category.id}>
-              {macro.name} / {category.name}
+              {macro.householdId ? "Famiglia" : "Personale"} / {macro.name} / {category.name}
             </option>
           ))
         )}
@@ -311,6 +312,9 @@ function BulkActionBar({
     ,
     { value: "delete", label: "Elimina" }
   ];
+  const selectedScopes = new Set(selectedItems.flatMap(item=>item.kind==="movement" ? [item.movement.isSharedWithHousehold ? item.movement.householdId : null] : []));
+  const targetScope = bulkAction==="share" ? households[0]?.id ?? null : bulkAction==="unshare" ? null : [...selectedScopes][0] ?? null;
+  const bulkCategories = (bulkAction!=="category" || selectedScopes.size<=1) ? categoryOptionsForScope(categoryTree,targetScope) : [];
   const selectedMovements = selectedItems.filter((item) => item.kind === "movement").map((item) => item.id);
   const selectedTransfers = selectedItems.filter((item) => item.kind === "transfer").map((item) => item.id);
 
@@ -328,9 +332,10 @@ function BulkActionBar({
         ))}
       </select>
       {bulkAction === "date" && <input name="occurredOn" type="date" className="h-11 w-full rounded-md border border-border px-3" />}
-      {bulkAction === "category" && (
-        <select name="categoryId" className="h-11 w-full rounded-md border border-border px-3">
-          {categoryOptions(categoryTree).map((option) => (
+      {(bulkAction === "category" || (hasMovements && (bulkAction === "share" || bulkAction === "unshare"))) && (
+        <select key={`${bulkAction}:${targetScope}`} required name="categoryId" defaultValue="" className="h-11 w-full rounded-md border border-border px-3">
+          <option value="">Scegli categoria nel bilancio di destinazione</option>
+          {bulkCategories.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>
@@ -348,7 +353,7 @@ function BulkActionBar({
       )}
       <Button
         type="submit"
-        disabled={selectedItems.length === 0}
+        disabled={selectedItems.length === 0 || (bulkAction === "category" && selectedScopes.size>1)}
         className="w-full"
         onClick={(event) => {
           if (bulkAction === "delete" && !window.confirm("Eliminare le operazioni selezionate?")) {

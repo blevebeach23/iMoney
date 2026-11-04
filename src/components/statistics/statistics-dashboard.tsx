@@ -10,6 +10,7 @@ interface StatisticsDashboardProps {
   report: StatisticsReport;
   households: ActiveHouseholdOption[];
   selectedHouseholdId: string | null;
+  includeShared?: boolean;
 }
 
 const currencyFormatter = new Intl.NumberFormat("it-IT", {
@@ -18,7 +19,7 @@ const currencyFormatter = new Intl.NumberFormat("it-IT", {
   style: "currency"
 });
 
-export function StatisticsDashboard({ households, report, selectedHouseholdId }: Readonly<StatisticsDashboardProps>) {
+export function StatisticsDashboard({ households, report, selectedHouseholdId, includeShared = false }: Readonly<StatisticsDashboardProps>) {
   return (
     <main className="mx-auto min-h-dvh max-w-md px-4 pb-24 pt-6">
       <header className="mb-5">
@@ -26,7 +27,7 @@ export function StatisticsDashboard({ households, report, selectedHouseholdId }:
         <h1 className="mt-2 text-3xl font-bold tracking-normal text-foreground">Analisi</h1>
       </header>
 
-      <StatisticsFilters report={report} households={households} selectedHouseholdId={selectedHouseholdId} />
+      <StatisticsFilters report={report} households={households} selectedHouseholdId={selectedHouseholdId} includeShared={includeShared} />
 
       <section className="mt-6 grid grid-cols-2 gap-3">
         <StatCard label="Entrate" value={report.summary.income} tone="good" />
@@ -69,7 +70,7 @@ export function StatisticsDashboard({ households, report, selectedHouseholdId }:
           report.macroCategories.map((macro) => (
             <Link
               key={macro.macroCategoryId}
-              href={`/movements?macroCategoryId=${macro.macroCategoryId}`}
+              href={report.scope==="family" ? `/family?householdId=${selectedHouseholdId}&month=${report.selectedMonth}&macroCategoryId=${macro.macroCategoryId}` : `/movements?macroCategoryId=${macro.macroCategoryId}&shared=${includeShared ? "all" : "no"}`}
               className="flex min-h-14 items-center justify-between rounded-md border border-border bg-white px-4 shadow-panel"
             >
               <span className="font-medium">{macro.macroCategoryName}</span>
@@ -87,7 +88,7 @@ export function StatisticsDashboard({ households, report, selectedHouseholdId }:
           report.categories.map((category) => (
             <Link
               key={category.categoryId}
-              href={`/movements?categoryId=${category.categoryId}`}
+              href={report.scope==="family" ? `/family?householdId=${selectedHouseholdId}&month=${report.selectedMonth}&categoryId=${category.categoryId}` : `/movements?categoryId=${category.categoryId}&shared=${includeShared ? "all" : "no"}`}
               className="flex min-h-14 items-center justify-between rounded-md border border-border bg-white px-4 shadow-panel"
             >
               <span>
@@ -106,7 +107,7 @@ export function StatisticsDashboard({ households, report, selectedHouseholdId }:
           <EmptyState text="Nessun rimborso nel periodo." />
         ) : (
           report.reimbursements.map((movement) => (
-            <Link key={movement.id} href={`/movements/${movement.id}`} className="flex min-h-14 items-center justify-between rounded-md border border-border bg-white px-4 shadow-panel">
+            <Link key={movement.id} href={report.scope==="family" ? `/family/movements/${movement.id}` : `/movements/${movement.id}`} className="flex min-h-14 items-center justify-between rounded-md border border-border bg-white px-4 shadow-panel">
               <span>
                 <span className="block font-medium">{movement.description}</span>
                 <span className="block text-xs font-semibold text-zinc-500">{movement.occurredOn}</span>
@@ -154,7 +155,7 @@ export function StatisticsDashboard({ households, report, selectedHouseholdId }:
 
       <section className="mt-6 grid grid-cols-3 gap-2">
         {report.monthlyTrend.map((point) => (
-          <Link key={point.month} href={`/months/${point.month}`} className="rounded-md border border-border bg-white p-3 text-center text-sm font-semibold shadow-panel">
+          <Link key={point.month} href={report.scope==="family" ? `/family?householdId=${selectedHouseholdId}&month=${point.month}` : `/months/${point.month}`} className="rounded-md border border-border bg-white p-3 text-center text-sm font-semibold shadow-panel">
             {point.label}
           </Link>
         ))}
@@ -166,14 +167,17 @@ export function StatisticsDashboard({ households, report, selectedHouseholdId }:
 function StatisticsFilters({
   households,
   report,
-  selectedHouseholdId
+  selectedHouseholdId,
+  includeShared
 }: Readonly<{
   households: ActiveHouseholdOption[];
   report: StatisticsReport;
   selectedHouseholdId: string | null;
+  includeShared: boolean;
 }>) {
   return (
     <form className="space-y-3 rounded-md border border-border bg-white p-4 shadow-panel">
+      <input type="hidden" name="includeShared" value={includeShared ? "1" : "0"} />
       <div className="grid grid-cols-2 gap-2">
         <label className="min-h-11">
           <input type="radio" name="scope" value="personal" defaultChecked={report.scope === "personal"} className="peer sr-only" />

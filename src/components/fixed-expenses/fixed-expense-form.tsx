@@ -1,5 +1,6 @@
 "use client";
 
+import { categoryOptionsForScope } from "@/lib/categories/scope";
 import { Save } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -63,7 +64,9 @@ export function FixedExpenseForm({
 }>) {
   const [state, action] = useFormState(saveFixedExpenseAction, initialState);
   const [requestedForUserId, setRequestedForUserId] = useState("self");
-  const categories = categoryOptions(categoryTree);
+  const [shared, setShared] = useState(fixedExpense?.isSharedWithHousehold ?? Boolean(households[0]?.shareByDefault));
+  const [selectedCategoryId, setSelectedCategoryId] = useState(fixedExpense?.categoryId ?? "");
+  const [householdId, setHouseholdId] = useState(fixedExpense?.householdId ?? households[0]?.id ?? "");
   const containers = containerOptions(accounts, funds);
   const today = new Date().toISOString().slice(0, 10);
   const defaultHousehold = households[0];
@@ -71,9 +74,10 @@ export function FixedExpenseForm({
   const activeMonths = new Set((fixedExpense?.activeMonths ?? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).map(String));
   const isRequestForOtherMember = !fixedExpense && requestedForUserId !== "self";
   const selectedRecipient = requestRecipients.find((member) => member.userId === requestedForUserId);
-  const selectedHouseholdId = isRequestForOtherMember ? selectedRecipient?.householdId : fixedExpense?.householdId ?? defaultHousehold?.id;
+  const selectedHouseholdId = isRequestForOtherMember ? selectedRecipient?.householdId : householdId;
 
-  if (categories.length === 0 || (containers.length === 0 && requestRecipients.length === 0)) {
+  const categories = categoryOptionsForScope(categoryTree, isRequestForOtherMember || shared ? selectedHouseholdId ?? null : null);
+  if (categoryTree.length === 0 || (containers.length === 0 && requestRecipients.length === 0)) {
     return (
       <div className="space-y-3 rounded-md border border-border bg-white p-4">
         <p className="font-semibold">Servono dati di base</p>
@@ -100,7 +104,7 @@ export function FixedExpenseForm({
           label="Per conto di"
           name="requestedForUserId"
           value={requestedForUserId}
-          onChange={(event) => setRequestedForUserId(event.target.value)}
+          onChange={(event) => { setRequestedForUserId(event.target.value); setSelectedCategoryId(""); }}
           options={[
             { value: "self", label: "Me stesso" },
             ...requestRecipients.map((member) => ({ value: member.userId, label: member.fullName || member.username || "Membro" }))
@@ -108,8 +112,9 @@ export function FixedExpenseForm({
           errors={state.fieldErrors}
         />
       )}
+      {households.length>1 && !isRequestForOtherMember && <SelectField label="Famiglia" name="selectedHousehold" value={householdId} onChange={(event)=>{setHouseholdId(event.target.value);setSelectedCategoryId("");}} options={households.map(h=>({value:h.id,label:h.name}))} />}
       <TextField label="Descrizione" name="description" defaultValue={fixedExpense?.description ?? ""} errors={state.fieldErrors} />
-      <SelectField label="Categoria" name="categoryId" defaultValue={fixedExpense?.categoryId ?? categories[0]?.value} options={categories} errors={state.fieldErrors} />
+      <SelectField label="Categoria" name="categoryId" required value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)} options={[{value:"",label:"Seleziona categoria"},...categories]} errors={state.fieldErrors} />
       <TextField label="Importo" name="amount" defaultValue={fixedExpense?.amount ?? ""} inputMode="decimal" errors={state.fieldErrors} />
       {isRequestForOtherMember ? (
         <p className="rounded-md border border-border bg-white p-3 text-sm leading-6 text-zinc-600">Il destinatario sceglierà conto o fondo quando accetta.</p>
@@ -135,7 +140,7 @@ export function FixedExpenseForm({
 
       {households.length > 0 && !isRequestForOtherMember && (
         <label className="flex min-h-12 items-center gap-3 rounded-md border border-border bg-white px-3">
-          <input name="sharedWithFamily" type="checkbox" defaultChecked={fixedExpense?.isSharedWithHousehold ?? Boolean(defaultHousehold?.shareByDefault)} className="h-5 w-5" />
+          <input name="sharedWithFamily" type="checkbox" checked={shared} onChange={(event) => { setShared(event.target.checked); setSelectedCategoryId(""); }} className="h-5 w-5" />
           <span className="text-sm font-semibold">Condividi con famiglia</span>
         </label>
       )}

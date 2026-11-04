@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Send, Save, Trash2 } from "lucide-react";
 import { useFormState } from "react-dom";
 import { BudgetManager } from "@/components/budgets/budget-manager";
@@ -192,6 +193,7 @@ export function FamilySettings({
           </section>
 
           <section className="space-y-3">
+            <Link href={`/settings/categories?householdId=${household.id}`} className="flex min-h-11 items-center font-semibold text-primary">Categorie famiglia</Link>
             <h2 className="text-lg font-semibold text-foreground">Budget famiglia</h2>
             <BudgetManager budgets={budgets} categoryTree={categoryTree} householdId={household.id} monthStart={monthStart} previousMonthStart={previousMonthStart} report={budgetReport} />
           </section>

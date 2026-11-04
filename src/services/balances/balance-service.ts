@@ -5,8 +5,9 @@ import { getFunds } from "@/services/funds/fund-service";
 import { getMovementsUntil } from "@/services/movements/movement-service";
 import { getTransfersUntil } from "@/services/transfers/transfer-service";
 import type { Account, Fund } from "@/types/domain";
+import { todayInRome } from "@/lib/calculations/dates";
 
-export async function rebuildBalanceCaches(supabase: SupabaseClient, userId: string, today = new Date().toISOString().slice(0, 10)): Promise<void> {
+export async function rebuildBalanceCaches(supabase: SupabaseClient, userId: string, today = todayInRome()): Promise<void> {
   const [accounts, funds, movements, transfers] = await Promise.all([
     getAccounts(supabase, userId),
     getFunds(supabase, userId),

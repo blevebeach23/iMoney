@@ -24,8 +24,8 @@ const fields: Array<{ key: ImportColumnKey; label: string }> = [
   { key: "notes", label: "Note" }
 ];
 
-function flattenCategories(categoryTree: CategoryTreeItem[]): Category[] {
-  return categoryTree.flatMap((macro) => macro.categories);
+function flattenCategories(categoryTree: CategoryTreeItem[]): Array<Category & { householdId: string | null }> {
+  return categoryTree.flatMap((macro) => macro.categories.map(c=>({...c,householdId:macro.householdId})));
 }
 
 function containerOptions(accounts: Account[], funds: Fund[]) {
@@ -63,6 +63,7 @@ export function ImportWorkflow({
   const [allowDuplicates, setAllowDuplicates] = useState(false);
   const [manualAccountMappings, setManualAccountMappings] = useState<Record<string, string>>({});
   const defaultHousehold = households[0];
+  const [scopeHouseholdId,setScopeHouseholdId] = useState("");
   const categories = useMemo(() => flattenCategories(categoryTree), [categoryTree]);
   const containers = useMemo(() => containerOptions(accounts, funds), [accounts, funds]);
 
@@ -73,14 +74,14 @@ export function ImportWorkflow({
         categoryId: defaultCategoryId,
         containerId: defaultContainerId,
         type: "expense",
-        sharedWithFamily: Boolean(defaultHousehold?.shareByDefault),
-        householdId: defaultHousehold?.id ?? null,
+        sharedWithFamily: Boolean(scopeHouseholdId),
+        householdId: scopeHouseholdId || defaultHousehold?.id || null,
         notes: ""
       },
       accountMappings: { ...accountMappings, ...manualAccountMappings },
       missingCategoryStrategy
     }),
-    [accountMappings, columns, defaultCategoryId, defaultContainerId, defaultHousehold?.id, defaultHousehold?.shareByDefault, manualAccountMappings, missingCategoryStrategy]
+    [accountMappings, columns, defaultCategoryId, defaultContainerId, defaultHousehold?.id, scopeHouseholdId, manualAccountMappings, missingCategoryStrategy]
   );
   const previewResult: { preview: ImportPreview | null; error: string | null } = useMemo(() => {
     if (rows.length === 0 || parseErrors.length > 0) {
@@ -190,7 +191,8 @@ export function ImportWorkflow({
       {headers.length > 0 && (
         <section className="space-y-4 rounded-md border border-border bg-white p-4 shadow-panel">
           <h2 className="text-lg font-semibold text-foreground">Default e categorie</h2>
-          <Select label="Categoria default" value={defaultCategoryId} onChange={setDefaultCategoryId} options={categories.map((category) => ({ value: category.id, label: category.name }))} />
+          <Select label="Bilancio default import" value={scopeHouseholdId} onChange={(value)=>{setScopeHouseholdId(value);setDefaultCategoryId("");}} options={[{value:"",label:"Personale"},...households.map(h=>({value:h.id,label:`Famiglia / ${h.name}`}))]} />
+          <Select label="Categoria default" value={defaultCategoryId} onChange={setDefaultCategoryId} options={[{value:"",label:"Seleziona categoria"},...categories.filter(c=>c.householdId===(scopeHouseholdId || null)).map(category=>({value:category.id,label:category.name}))]} />
           <Select label="Conto/Fondo default" value={defaultContainerId} onChange={setDefaultContainerId} options={containers} />
           <Select
             label="Categoria mancante"

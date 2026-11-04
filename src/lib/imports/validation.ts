@@ -9,7 +9,7 @@ const importMovementSchema = z
       .regex(/^\d+(\.\d{2})$/, "Importo positivo con due decimali")
       .refine((value) => Number(value) > 0, "Importo deve essere maggiore di zero"),
     type: z.enum(["income", "expense", "reimbursement"]),
-    categoryId: z.string().uuid("Categoria obbligatoria"),
+    categoryId: z.union([z.string().uuid("Categoria obbligatoria"),z.literal("")]),
     accountId: z.string().uuid().nullable(),
     fundId: z.string().uuid().nullable(),
     isReimbursement: z.boolean(),
@@ -18,6 +18,7 @@ const importMovementSchema = z
     notes: z.string().trim().max(1000, "Note troppo lunghe"),
     createCategoryName: z.string().trim().min(1).max(80).optional()
   })
+  .refine((value) => Boolean(value.categoryId || value.createCategoryName), { message:"Categoria obbligatoria", path:["categoryId"] })
   .refine((value) => Number(Boolean(value.accountId)) + Number(Boolean(value.fundId)) === 1, {
     message: "Seleziona esattamente un conto o un fondo",
     path: ["accountId"]

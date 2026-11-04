@@ -26,7 +26,7 @@ export default async function EditMovementPage({ params, searchParams }: Readonl
   const [accounts, funds, categoryTree, households, movement] = await Promise.all([
     getAccounts(supabase, user.id),
     getFunds(supabase, user.id),
-    getCategoryTree(supabase, user.id),
+    getCategoryTree(supabase, user.id, { includeHouseholds: true }),
     getActiveHouseholdOptions(supabase, user.id),
     getMovementById(supabase, user.id, params.id)
   ]);

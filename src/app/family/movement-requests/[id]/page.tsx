@@ -26,7 +26,7 @@ export default async function MovementRequestDetailPage({ params }: Readonly<{ p
 
   const [accounts, funds, categoryTree] =
     request.recipientUserId === user.id && request.status === "PENDING"
-      ? await Promise.all([getAccounts(supabase, user.id), getFunds(supabase, user.id), getCategoryTree(supabase, user.id)])
+      ? await Promise.all([getAccounts(supabase, user.id), getFunds(supabase, user.id), getCategoryTree(supabase, user.id, { householdId: request.householdId })])
       : [[], [], []];
 
   return (

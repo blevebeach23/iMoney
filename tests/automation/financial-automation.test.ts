@@ -169,7 +169,7 @@ describe("financial automation on PostgreSQL", () => {
       insert into household_members(household_id,user_id,role,status,joined_at) values
         ('${household}','${owner}','owner','ACTIVE',now()), ('${household}','${stranger}','member','ACTIVE',now());
       insert into fixed_expenses(owner_user_id,household_id,account_id,category_id,amount,description,starts_on,ends_on,day_of_month,shared_with_family)
-        values ('${owner}','${household}','${bank}','${category}',30,'Family recurring','2026-10-29','2026-10-29',29,true);
+        values ('${owner}','${household}','${bank}',(select c.id from categories c join macro_categories mc on mc.id=c.macro_category_id where mc.household_id='${household}' and mc.name='CASA' and c.name='Affitto'),30,'Family recurring','2026-10-29','2026-10-29',29,true);
     `);
     await Promise.all([sync(), sync()]);
     await db.exec(`set role authenticated; select set_config('request.jwt.claim.sub','${stranger}',false)`);
@@ -260,6 +260,26 @@ describe("financial automation on PostgreSQL", () => {
     await db.exec(`set role authenticated; select set_config('request.jwt.claim.sub','${stranger}',false)`);
     expect(await getCreditCardSettlementHistoryForUser(historyClient, owner)).toEqual([]);
     await db.exec(`reset role; select set_config('request.jwt.claim.sub','${owner}',false)`);
+  });
+
+  it("keeps dated opening balances out of caches until the accounting day is reached", async () => {
+    await clock("2026-11-04");
+    const futureIds = ["20000000-0000-4000-8000-000000000021", "20000000-0000-4000-8000-000000000022", "20000000-0000-4000-8000-000000000023"];
+    const futureFund = "60000000-0000-4000-8000-000000000021";
+    for (const [index, type] of ["cash", "bank", "credit_card"].entries()) {
+      await db.query(`insert into accounts(id,owner_user_id,name,type,opening_balance,opening_balance_date)
+        values ($1,$2,$3,$4,125.50,'2026-11-05')`, [futureIds[index], owner, `Future ${type}`, type]);
+    }
+    await db.query(`insert into funds(id,owner_user_id,name,type,opening_balance,opening_balance_date)
+      values ($1,$2,'Future savings','savings',75.25,'2026-11-05')`, [futureFund, owner]);
+    await sync();
+    expect((await db.query("select cached_balance from accounts where id = any($1::uuid[])", [futureIds])).rows)
+      .toEqual([{ cached_balance: "0.00" }, { cached_balance: "0.00" }, { cached_balance: "0.00" }]);
+    expect((await db.query("select cached_balance from funds where id=$1", [futureFund])).rows[0]).toEqual({ cached_balance: "0.00" });
+    await clock("2026-11-05"); await sync();
+    expect((await db.query("select cached_balance from accounts where id = any($1::uuid[])", [futureIds])).rows)
+      .toEqual([{ cached_balance: "125.50" }, { cached_balance: "125.50" }, { cached_balance: "125.50" }]);
+    expect((await db.query("select cached_balance from funds where id=$1", [futureFund])).rows[0]).toEqual({ cached_balance: "75.25" });
   });
 
   it("denies cross-owner and anonymous RPC calls and keeps the ledger private under RLS", async () => {
