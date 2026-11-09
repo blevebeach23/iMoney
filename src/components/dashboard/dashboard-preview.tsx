@@ -199,9 +199,9 @@ export function DashboardPreview({
         <h2 className="text-lg font-semibold text-foreground">Previsione di liquidità</h2>
         {liquidity && (
           <>
-            <p className="text-sm text-zinc-600">Saldo attuale: EUR {liquidity.liquidity}</p>
-            <p className="text-lg font-bold tabular-nums">Saldo previsto a fine {monthLabel}: EUR {liquidity.forecast}</p>
-            <p className="text-xs text-zinc-600">Include operazioni future e addebiti automatici carta entro il mese selezionato.</p>
+            <p className="text-sm text-zinc-600">Liquidità netta attuale: EUR {liquidity.liquidity}</p>
+            <p className="text-lg font-bold tabular-nums">Liquidità netta prevista a fine {monthLabel}: EUR {liquidity.forecast}</p>
+            <p className="text-xs text-zinc-600">Include saldi negativi, operazioni future e addebiti automatici carta entro il mese selezionato. Il debito carta con pagamento successivo resta separato.</p>
           </>
         )}
         {liquidityEvents.map((event) => (

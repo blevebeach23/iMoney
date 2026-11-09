@@ -2,11 +2,17 @@ import { describe, expect, it } from "vitest";
 import {
   accountFormSchema,
   categoryFormSchema,
+  creditCardSettingsFormSchema,
   fundFormSchema,
   macroCategoryFormSchema
 } from "@/lib/master-data/validation";
 
 describe("master data validation", () => {
+  it("requires calendar-month card closing and retains the configured payment day", () => {
+    const input = { accountId: "10000000-0000-4000-8000-000000000001", settlementAccountId: "10000000-0000-4000-8000-000000000002", statementClosingDay: "31", paymentDay: "5", automaticSettlement: true };
+    expect(creditCardSettingsFormSchema.parse(input)).toMatchObject({ statementClosingDay: 31, paymentDay: 5 });
+    expect(creditCardSettingsFormSchema.safeParse({ ...input, statementClosingDay: "30" }).success).toBe(false);
+  });
   it("validates account data and normalizes decimal commas", () => {
     const parsed = accountFormSchema.parse({
       name: "Conto corrente",

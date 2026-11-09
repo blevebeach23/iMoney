@@ -6,6 +6,8 @@ export function calculateLiquiditySummary(accounts: Account[], balances: Financi
   const liquidIds = new Set(accounts.filter((a) => a.type === "bank" || a.type === "cash").map((a) => a.id));
   const bank = balances.bank.filter((row) => liquidIds.has(row.id));
   const cash = balances.cash.filter((row) => liquidIds.has(row.id));
+  // Sum signed balances, including overdrafts: an internal transfer must have
+  // zero effect on liquidity even when either account crosses zero.
   const liquidity = [...bank, ...cash].reduce((sum, row) => sum.plus(row.balance), toDecimal(0));
   const cardDebt = balances.creditCardsDue.reduce((sum, row) => sum.plus(toDecimal(row.due).gt(0) ? row.due : 0), toDecimal(0));
   const forecast = balances.forecastMonthEnd.filter((row) => liquidIds.has(row.id)).reduce((sum, row) => sum.plus(row.balance), toDecimal(0));

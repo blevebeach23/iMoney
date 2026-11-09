@@ -119,9 +119,9 @@ describe("financial automation on PostgreSQL", () => {
   it("settles 800 once, then only 170 in the next cycle, rebuilding bank and card caches", async () => {
     await clock("2026-10-14");
     await db.exec(`
-      insert into credit_card_settings(account_id,settlement_account_id,statement_closing_day,payment_day) values ('${card}','${bank}',14,15);
+      insert into credit_card_settings(account_id,settlement_account_id,statement_closing_day,payment_day) values ('${card}','${bank}',31,15);
       insert into movements(owner_user_id,account_id,category_id,type,amount,occurred_on,description) values
-        ('${owner}','${card}','${category}','expense',800,'2026-10-10','Card old'),
+        ('${owner}','${card}','${category}','expense',800,'2026-09-10','Card old'),
         ('${owner}','${card}','${category}','expense',100,'2026-10-16','Card new'),
         ('${owner}','${card}','${category}','expense',70,'2026-10-20','Card new');
     `);
@@ -146,13 +146,13 @@ describe("financial automation on PostgreSQL", () => {
     await clock("2026-10-15");
     await db.exec(`
       insert into accounts(id,owner_user_id,name,type,opening_balance,opening_balance_date) values ('${secondCard}','${owner}','Second card','credit_card',300,'2026-09-01');
-      insert into credit_card_settings(account_id,settlement_account_id,statement_closing_day,payment_day) values ('${secondCard}','${bank}',14,15);
+      insert into credit_card_settings(account_id,settlement_account_id,statement_closing_day,payment_day) values ('${secondCard}','${bank}',31,15);
       insert into transfers(owner_user_id,from_account_id,to_account_id,amount,occurred_on) values ('${owner}','${bank}','${secondCard}',300,'2026-10-05');
       insert into movements(owner_user_id,account_id,category_id,type,amount,occurred_on) values
-        ('${owner}','${secondCard}','${category}','expense',100,'2026-10-10'),
-        ('${owner}','${secondCard}','${category}','reimbursement',30,'2026-10-11'),
+        ('${owner}','${secondCard}','${category}','expense',100,'2026-09-10'),
+        ('${owner}','${secondCard}','${category}','reimbursement',30,'2026-09-11'),
         ('${owner}','${secondCard}','${category}','reimbursement',100,'2026-10-16'),
-        ('${owner}','${secondCard}','${category}','expense',120,'2026-11-10');
+        ('${owner}','${secondCard}','${category}','expense',120,'2026-10-20');
     `);
     await sync(); await sync();
     expect((await db.query("select amount from transfers where credit_card_account_id=$1", [secondCard])).rows).toEqual([{ amount: "70.00" }]);
@@ -186,11 +186,11 @@ describe("financial automation on PostgreSQL", () => {
     await clock("2026-10-14");
     await db.exec(`
       insert into accounts(id,owner_user_id,name,type,opening_balance,opening_balance_date)
-        values ('${regressionCard}','${owner}','Regression card','credit_card',0,'2026-10-01');
+        values ('${regressionCard}','${owner}','Regression card','credit_card',0,'2026-09-01');
       insert into credit_card_settings(account_id,settlement_account_id,statement_closing_day,payment_day)
-        values ('${regressionCard}','${bank}',14,15);
+        values ('${regressionCard}','${bank}',31,15);
       insert into movements(owner_user_id,account_id,category_id,type,amount,occurred_on) values
-        ('${owner}','${regressionCard}','${category}','expense',800,'2026-10-10'),
+        ('${owner}','${regressionCard}','${category}','expense',800,'2026-09-10'),
         ('${owner}','${regressionCard}','${category}','expense',100,'2026-10-16'),
         ('${owner}','${regressionCard}','${category}','expense',70,'2026-10-20');
     `);
@@ -222,7 +222,7 @@ describe("financial automation on PostgreSQL", () => {
       opening_balance as "openingBalance", opening_balance_date::text as "openingBalanceDate", cached_balance as "cachedBalance",
       cached_at::text as "cachedAt", deleted_at::text as "deletedAt" from accounts where id=$1 or id=$2`, [bank, regressionCard])).rows;
     const settings: CreditCardSettings[] = [{ id: "regression-settings", accountId: regressionCard, settlementAccountId: bank,
-      statementClosingDay: 14, paymentDay: 15, automaticSettlement: true, createdAt: "2026-10-01", updatedAt: "2026-10-01" }];
+      statementClosingDay: 31, paymentDay: 15, automaticSettlement: true, createdAt: "2026-10-01", updatedAt: "2026-10-01" }];
     const forecast = async (today: string) => {
       const transfers = (await db.query<Transfer>(`select id, owner_user_id as "ownerUserId", household_id as "householdId",
         from_account_id as "fromAccountId", to_account_id as "toAccountId", from_fund_id as "fromFundId", to_fund_id as "toFundId",

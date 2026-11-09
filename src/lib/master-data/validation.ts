@@ -75,7 +75,7 @@ export const categoryFormSchema = z.object({
 export const creditCardSettingsFormSchema = z.object({
   accountId: z.string().uuid("Carta obbligatoria"),
   settlementAccountId: z.string().uuid("Conto di addebito obbligatorio"),
-  statementClosingDay: z.coerce.number().int().min(1, "Giorno non valido").max(31, "Giorno non valido"),
+  statementClosingDay: z.coerce.number().pipe(z.literal(31)),
   paymentDay: z.coerce.number().int().min(1, "Giorno non valido").max(31, "Giorno non valido"),
   automaticSettlement: z.boolean()
 }).refine((value) => value.accountId !== value.settlementAccountId, {

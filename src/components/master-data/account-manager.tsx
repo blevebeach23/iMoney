@@ -71,10 +71,10 @@ function CreditCardSettingsForm({
         <FormMessage state={state} />
         <input type="hidden" name="accountId" value={account.id} />
         <SelectField label="Conto corrente di addebito" name="settlementAccountId" defaultValue={settings?.settlementAccountId ?? bankOptions[0]?.value} options={bankOptions} errors={state.fieldErrors} />
-        <div className="grid grid-cols-2 gap-3">
-          <TextField label="Giorno chiusura" name="statementClosingDay" type="number" min={1} max={31} defaultValue={settings?.statementClosingDay ?? 30} errors={state.fieldErrors} />
-          <TextField label="Giorno addebito" name="paymentDay" type="number" min={1} max={31} defaultValue={settings?.paymentDay ?? 5} errors={state.fieldErrors} />
-        </div>
+        <input type="hidden" name="statementClosingDay" value="31" />
+        <p className="text-sm text-zinc-600">Ciclo carta: dal primo all&apos;ultimo giorno del mese, inclusi.</p>
+        <TextField label="Giorno addebito" name="paymentDay" type="number" min={1} max={31} defaultValue={settings?.paymentDay ?? 5} errors={state.fieldErrors} />
+        <p className="text-xs text-zinc-600">Giorni 1–30: addebito nel mese successivo. Giorno 31: addebito a fine mese. Nei mesi brevi si usa l&apos;ultimo giorno disponibile.</p>
         <label className="flex min-h-12 items-center gap-3 rounded-md border border-border bg-white px-3">
           <input name="automaticSettlement" type="checkbox" defaultChecked={settings?.automaticSettlement ?? true} className="h-5 w-5" />
           <span className="text-sm font-semibold">Addebito automatico</span>

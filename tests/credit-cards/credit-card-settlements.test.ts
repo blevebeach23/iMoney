@@ -82,9 +82,43 @@ function settings(partial: Partial<CreditCardSettings> = {}): CreditCardSettings
 }
 
 describe("credit card settlement calculations", () => {
-  it("calculates contiguous cutoff cycles with payment on day 5 of next month", () => {
+  it.each([
+    ["2026-01-31", "2026-01-01", "2026-01-31", "2026-02-05"],
+    ["2026-02-28", "2026-02-01", "2026-02-28", "2026-03-05"],
+    ["2028-02-29", "2028-02-01", "2028-02-29", "2028-03-05"],
+    ["2026-04-30", "2026-04-01", "2026-04-30", "2026-05-05"],
+    ["2026-12-31", "2026-12-01", "2026-12-31", "2027-01-05"]
+  ])("closes the complete calendar month on %s", (today, cycleStartOn, cycleEndOn, paymentOn) => {
+    expect(calculateSettlementCycle(today, 14, 5)).toEqual({ cycleStartOn, cycleEndOn, paymentOn });
+  });
+
+  it("includes October 31 in November's payment and November 1 in December's payment", () => {
+    const forecasts = buildCreditCardForecasts({
+      accounts: [account(), account({ id: "card-1", type: "credit_card" })], settings: [settings()], transfers: [], bankBalances: [], today: "2026-10-31",
+      movements: [movement({ occurredOn: "2026-10-01", amount: "0.10" }), movement({ occurredOn: "2026-10-31", amount: "0.20" }), movement({ occurredOn: "2026-11-01", amount: "10.00" })]
+    });
+    expect(forecasts.map((f) => [f.cycleStartOn, f.cycleEndOn, f.paymentOn, f.amountDue])).toEqual([
+      ["2026-10-01", "2026-10-31", "2026-11-05", "0.30"],
+      ["2026-11-01", "2026-11-30", "2026-12-05", "10.00"]
+    ]);
+    expect(forecasts[0].nextCycleAmount).toBe("10.00");
+  });
+
+  it.each([null, "2026-11-06T00:00:00Z"])("retains a legacy October 30 settlement with deletedAt=%s without a second October charge", (deletedAt) => {
+    const paid = transfer({ amount: "200.00", occurredOn: "2026-11-05", creditCardAccountId: "card-1", creditCardCycleStartOn: "2026-10-01", creditCardCycleEndOn: "2026-10-30", deletedAt });
+    const forecasts = buildCreditCardForecasts({
+      accounts: [account(), account({ id: "card-1", type: "credit_card" })], settings: [settings()], bankBalances: [], today: "2026-11-09",
+      movements: [movement({ amount: "200.00", occurredOn: "2026-10-30" }), movement({ amount: "50.00", occurredOn: "2026-10-31" }), movement({ amount: "120.00", occurredOn: "2026-11-10" })],
+      transfers: deletedAt ? [] : [paid], settlementHistory: [paid]
+    });
+    expect(hasCreditCardSettlement([paid], "user-1", "card-1", "2026-10-31")).toBe(true);
+    expect(forecasts.map((f) => [f.cycleStartOn, f.cycleEndOn, f.paymentOn, f.amountDue])).toEqual([["2026-11-01", "2026-11-30", "2026-12-05", "170.00"]]);
+    expect(buildVirtualCreditCardSettlementTransfers("user-1", forecasts, [paid]).map((t) => t.amount)).toEqual(["170.00"]);
+  });
+
+  it("uses full calendar months with payment on day 5 of next month", () => {
     expect(calculateSettlementCycle("2026-10-01", 30, 5)).toEqual({
-      cycleStartOn: "2026-08-31",
+      cycleStartOn: "2026-09-01",
       cycleEndOn: "2026-09-30",
       paymentOn: "2026-10-05"
     });
@@ -179,11 +213,11 @@ describe("credit card settlement calculations", () => {
   });
   it("advances from the paid 800 cycle to the next 170 cycle without counting purchases twice", () => {
     const accounts = [account({ openingBalance: "3750.00" }), account({ id: "card-1", type: "credit_card", openingBalance: "0.00" })];
-    const movements = [movement({ amount: "800.00", occurredOn: "2026-10-10" }), movement({ amount: "100.00", occurredOn: "2026-10-16" }), movement({ amount: "70.00", occurredOn: "2026-10-20" })];
+    const movements = [movement({ amount: "800.00", occurredOn: "2026-09-10" }), movement({ amount: "100.00", occurredOn: "2026-10-16" }), movement({ amount: "70.00", occurredOn: "2026-10-20" })];
     const input = { accounts, settings: [settings({ statementClosingDay: 14, paymentDay: 15 })], movements, bankBalances: [{ id: "bank-1", balance: "3750.00" }] };
     const before = buildCreditCardForecasts({ ...input, movements: movements.slice(0, 1), transfers: [], today: "2026-10-14" });
     expect(before.map((f) => [f.paymentOn, f.amountDue])).toEqual([["2026-10-15", "800.00"]]);
-    const settlement = transfer({ amount: "800.00", occurredOn: "2026-10-15", creditCardAccountId: "card-1", creditCardCycleStartOn: "2026-09-15", creditCardCycleEndOn: "2026-10-14" });
+    const settlement = transfer({ amount: "800.00", occurredOn: "2026-10-15", creditCardAccountId: "card-1", creditCardCycleStartOn: "2026-09-01", creditCardCycleEndOn: "2026-09-30" });
     const after = buildCreditCardForecasts({ ...input, transfers: [settlement], today: "2026-10-21" });
     expect(after.map((f) => [f.paymentOn, f.amountDue])).toEqual([["2026-11-15", "170.00"]]);
     const balances = calculateFinancialBalances(accounts, [], movements, [settlement], "2026-10-21", "2026-10-31");
@@ -192,11 +226,11 @@ describe("credit card settlement calculations", () => {
     expect(calculateMonthlySummary(movements).grossExpenses).toBe("970.00");
   });
 
-  it("includes the closing day and spans the previous cutoff rather than calendar month start", () => {
-    expect(calculateSettlementCycle("2026-10-14", 14, 15)).toEqual({ cycleStartOn: "2026-09-15", cycleEndOn: "2026-10-14", paymentOn: "2026-10-15" });
+  it("includes the first and last day of each calendar month even with legacy closing-day settings", () => {
+    expect(calculateSettlementCycle("2026-10-14", 14, 15)).toEqual({ cycleStartOn: "2026-09-01", cycleEndOn: "2026-09-30", paymentOn: "2026-10-15" });
     const forecasts = buildCreditCardForecasts({
       accounts: [account(), account({ id: "card-1", type: "credit_card" })], settings: [settings({ statementClosingDay: 14, paymentDay: 15 })],
-      movements: [movement({ occurredOn: "2026-09-15", amount: "0.10" }), movement({ occurredOn: "2026-10-14", amount: "0.20" }), movement({ occurredOn: "2026-10-15", amount: "10.00" })],
+      movements: [movement({ occurredOn: "2026-09-01", amount: "0.10" }), movement({ occurredOn: "2026-09-30", amount: "0.20" }), movement({ occurredOn: "2026-10-01", amount: "10.00" })],
       transfers: [], bankBalances: [], today: "2026-10-14"
     });
     expect(forecasts.map((f) => [f.paymentOn, f.amountDue])).toEqual([["2026-10-15", "0.30"], ["2026-11-15", "10.00"]]);
@@ -216,7 +250,7 @@ describe("credit card settlement calculations", () => {
     const forecasts = buildCreditCardForecasts({
       accounts: [account(), account({ id: "card-1", type: "credit_card", openingBalance: "300.00", openingBalanceDate: "2026-09-01" })],
       settings: [settings({ statementClosingDay: 14, paymentDay: 15 })],
-      movements: [movement({ occurredOn: "2026-10-10", amount: "100.00" }), movement({ occurredOn: "2026-10-11", type: "reimbursement", amount: "30.00" }), movement({ occurredOn: "2026-10-16", type: "reimbursement", amount: "100.00" }), movement({ occurredOn: "2026-11-10", amount: "120.00" })],
+      movements: [movement({ occurredOn: "2026-09-10", amount: "100.00" }), movement({ occurredOn: "2026-09-11", type: "reimbursement", amount: "30.00" }), movement({ occurredOn: "2026-10-16", type: "reimbursement", amount: "100.00" }), movement({ occurredOn: "2026-10-20", amount: "120.00" })],
       transfers: [transfer({ occurredOn: "2026-10-05", amount: "300.00" })], bankBalances: [], today: "2026-10-14"
     });
     expect(forecasts.map((f) => [f.paymentOn, f.amountDue])).toEqual([["2026-10-15", "70.00"], ["2026-11-15", "20.00"]]);
@@ -224,19 +258,19 @@ describe("credit card settlement calculations", () => {
 
   it("keeps a soft-deleted settlement closed and forecasts only the next cycle", () => {
     const accounts = [account(), account({ id: "card-1", type: "credit_card" })];
-    const movements = [movement({ amount: "800.00", occurredOn: "2026-10-10" }), movement({ amount: "100.00", occurredOn: "2026-10-16" }), movement({ amount: "70.00", occurredOn: "2026-10-20" })];
-    const settlement = transfer({ amount: "800.00", occurredOn: "2026-10-15", creditCardAccountId: "card-1", creditCardCycleStartOn: "2026-09-01", creditCardCycleEndOn: "2026-10-14" });
+    const movements = [movement({ amount: "800.00", occurredOn: "2026-09-10" }), movement({ amount: "100.00", occurredOn: "2026-10-16" }), movement({ amount: "70.00", occurredOn: "2026-10-20" })];
+    const settlement = transfer({ amount: "800.00", occurredOn: "2026-10-15", creditCardAccountId: "card-1", creditCardCycleStartOn: "2026-09-01", creditCardCycleEndOn: "2026-09-30" });
     const input = { accounts, movements, settings: [settings({ statementClosingDay: 14, paymentDay: 15 })], bankBalances: [], today: "2026-10-21" };
     const before = buildCreditCardForecasts({ ...input, transfers: [settlement], settlementHistory: [settlement] });
     const cancelled = { ...settlement, deletedAt: "2026-10-21T09:00:00Z" };
     // Mimic ordinary queries: the deleted row is absent from financial transfers.
     const after = buildCreditCardForecasts({ ...input, transfers: [], settlementHistory: [cancelled] });
-    expect(hasCreditCardSettlement([cancelled], "user-1", "card-1", "2026-10-14")).toBe(true);
+    expect(hasCreditCardSettlement([cancelled], "user-1", "card-1", "2026-09-30")).toBe(true);
     expect(before.map((f) => [f.paymentOn, f.amountDue])).toEqual([["2026-11-15", "170.00"]]);
     expect(after.map((f) => [f.paymentOn, f.amountDue])).toEqual([["2026-11-15", "170.00"]]);
     const virtual = buildVirtualCreditCardSettlementTransfers("user-1", after, [cancelled]);
     expect(virtual.map((t) => [t.occurredOn, t.amount])).toEqual([["2026-11-15", "170.00"]]);
-    expect(buildVirtualCreditCardSettlementTransfers("user-1", [{ ...after[0], cycleEndOn: "2026-10-14", cycleStartOn: "2026-09-15", paymentOn: "2026-10-15", amountDue: "800.00" }], [cancelled])).toEqual([]);
+    expect(buildVirtualCreditCardSettlementTransfers("user-1", [{ ...after[0], cycleEndOn: "2026-09-30", cycleStartOn: "2026-09-01", paymentOn: "2026-10-15", amountDue: "800.00" }], [cancelled])).toEqual([]);
     // Actual balances must still reverse the deleted payment, without applying history.
     const balances = calculateFinancialBalances(accounts, [], movements, virtual, input.today, "2026-11-30");
     expect(balances.bank[0].balance).toBe("1000.00");
@@ -248,7 +282,7 @@ describe("credit card settlement calculations", () => {
     const foreign = transfer({ ownerUserId: "other-user", amount: "800.00", occurredOn: "2026-10-15", creditCardAccountId: "card-1", creditCardCycleEndOn: "2026-10-14", deletedAt: "2026-10-20T00:00:00Z" });
     expect(hasCreditCardSettlement([foreign], "user-1", "card-1", "2026-10-14")).toBe(false);
     const forecasts = buildCreditCardForecasts({ accounts: [account(), account({ id: "card-1", type: "credit_card" })], settings: [settings({ statementClosingDay: 14, paymentDay: 15 })], movements: [movement({ amount: "800.00", occurredOn: "2026-10-10" })], transfers: [], settlementHistory: [foreign], bankBalances: [], today: "2026-10-21" });
-    expect(forecasts.map((f) => [f.paymentOn, f.amountDue])).toEqual([["2026-10-15", "800.00"]]);
+    expect(forecasts.map((f) => [f.paymentOn, f.amountDue])).toEqual([["2026-11-15", "800.00"]]);
   });
 
   it("ignores cancelled ordinary transfers and does not subtract an active settlement twice", () => {

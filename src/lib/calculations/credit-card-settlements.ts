@@ -1,6 +1,9 @@
 import type { Account, CreditCardSettings, Movement, Transfer } from "@/types/domain";
 import { formatMoney, toDecimal } from "./money";
 
+/** 31 is the persisted sentinel for the actual last day of each month. */
+export const CREDIT_CARD_MONTH_END_DAY = 31;
+
 /** Persistent cycle identity is retained on the soft-deleted settlement row. */
 export type CreditCardSettlementIdentity = Pick<Transfer, "ownerUserId" | "creditCardAccountId" | "creditCardCycleEndOn">;
 export type CreditCardSettlementHistoryEntry = CreditCardSettlementIdentity & Pick<Transfer, "amount" | "occurredOn" | "deletedAt">;
@@ -35,17 +38,22 @@ export function dateWithClampedDay(year: number, month: number, day: number): st
   return `${year}-${String(month).padStart(2, "0")}-${String(resolvedDay).padStart(2, "0")}`;
 }
 
-export function calculateSettlementCycle(today: string, statementClosingDay: number, paymentDay: number): CreditCardSettlementCycle {
+export function calculateSettlementCycle(today: string, _statementClosingDay: number, paymentDay: number): CreditCardSettlementCycle {
   const current = parseDate(today);
-  const currentClosing = dateWithClampedDay(current.year, current.month, statementClosingDay);
-  const cycleEnd = today < currentClosing ? previousMonthDate(current.year, current.month, statementClosingDay) : currentClosing;
+  const currentClosing = dateWithClampedDay(current.year, current.month, CREDIT_CARD_MONTH_END_DAY);
+  const cycleEnd = today < currentClosing ? previousMonthDate(current.year, current.month, CREDIT_CARD_MONTH_END_DAY) : currentClosing;
   const cycleEndParts = parseDate(cycleEnd);
-  const paymentBase = addMonths(cycleEndParts.year, cycleEndParts.month, paymentDay < statementClosingDay ? 1 : 0);
+  return calendarMonthCycle(cycleEndParts.year, cycleEndParts.month, paymentDay);
+}
 
+function calendarMonthCycle(year: number, month: number, paymentDay: number): CreditCardSettlementCycle {
+  // Retain the existing payment convention: nominal day 31 pays on closing day;
+  // days 1–30 pay in the following month, clamped to that month's last day.
+  const payment = addMonths(year, month, paymentDay < CREDIT_CARD_MONTH_END_DAY ? 1 : 0);
   return {
-    cycleStartOn: nextDay(previousMonthDate(cycleEndParts.year, cycleEndParts.month, statementClosingDay)),
-    cycleEndOn: cycleEnd,
-    paymentOn: dateWithClampedDay(paymentBase.year, paymentBase.month, paymentDay)
+    cycleStartOn: dateWithClampedDay(year, month, 1),
+    cycleEndOn: dateWithClampedDay(year, month, CREDIT_CARD_MONTH_END_DAY),
+    paymentOn: dateWithClampedDay(payment.year, payment.month, paymentDay)
   };
 }
 
@@ -81,10 +89,11 @@ export function calculateUnpaidCardPurchases(accountId: string, movements: Movem
 }
 
 export function hasCreditCardSettlement(history: readonly CreditCardSettlementIdentity[], ownerUserId: string, accountId: string, cycleEndOn: string): boolean {
-  // Same identity as guard_settlement_identity and sync_financial_automation.
-  // Do not filter deleted_at or use the start date (legacy cycles used month start).
+  // Same monthly identity as guard_settlement_identity and automation. Preserve
+  // legacy mid-month settlements (including deleted ones) without charging the
+  // same closing month again. Remaining unpaid purchases carry forward.
   return history.some((entry) => entry.ownerUserId === ownerUserId
-    && entry.creditCardAccountId === accountId && entry.creditCardCycleEndOn === cycleEndOn);
+    && entry.creditCardAccountId === accountId && entry.creditCardCycleEndOn?.slice(0, 7) === cycleEndOn.slice(0, 7));
 }
 
 export function buildCreditCardForecasts(input: {
@@ -119,14 +128,8 @@ export function buildCreditCardForecasts(input: {
     const horizon = addMonths(last.year, last.month, 1);
     const candidates: CreditCardSettlementCycle[] = [];
     for (let month = { year: first.year, month: first.month }; `${month.year}-${String(month.month).padStart(2, "0")}` <= `${horizon.year}-${String(horizon.month).padStart(2, "0")}`; month = addMonths(month.year, month.month, 1)) {
-      const end = dateWithClampedDay(month.year, month.month, setting.statementClosingDay);
-      const payment = addMonths(month.year, month.month, setting.paymentDay < setting.statementClosingDay ? 1 : 0);
-      const candidate = {
-        cycleStartOn: nextDay(previousMonthDate(month.year, month.month, setting.statementClosingDay)),
-        cycleEndOn: end,
-        paymentOn: dateWithClampedDay(payment.year, payment.month, setting.paymentDay)
-      };
-      if (!hasCreditCardSettlement(settlementHistory, card.ownerUserId, card.id, end)) candidates.push(candidate);
+      const candidate = calendarMonthCycle(month.year, month.month, setting.paymentDay);
+      if (!hasCreditCardSettlement(settlementHistory, card.ownerUserId, card.id, candidate.cycleEndOn)) candidates.push(candidate);
     }
     let projectedPayments = toDecimal(0);
     const unpaid = candidates.flatMap((cycle) => {
@@ -143,7 +146,7 @@ export function buildCreditCardForecasts(input: {
       const amountDue = cycle.amountDue;
       const end = parseDate(cycle.cycleEndOn);
       const next = addMonths(end.year, end.month, 1);
-      const nextCycleAmount = calculateCreditCardCycleAmount(card.id, input.movements, nextDay(cycle.cycleEndOn), dateWithClampedDay(next.year, next.month, setting.statementClosingDay));
+      const nextCycleAmount = calculateCreditCardCycleAmount(card.id, input.movements, nextDay(cycle.cycleEndOn), dateWithClampedDay(next.year, next.month, CREDIT_CARD_MONTH_END_DAY));
       const bankBalance = toDecimal(bankBalanceById.get(setting.settlementAccountId) ?? settlementAccount.openingBalance);
       const due = toDecimal(amountDue);
       const missing = due.minus(bankBalance);

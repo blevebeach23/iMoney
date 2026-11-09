@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   buildCreditCardForecasts,
+  CREDIT_CARD_MONTH_END_DAY,
   hasCreditCardSettlement,
   type CreditCardSettlementHistoryEntry,
   type CreditCardSettlementIdentity,
@@ -70,7 +71,7 @@ export async function saveCreditCardSettings(supabase: SupabaseClient, userId: s
     {
       account_id: input.accountId,
       settlement_account_id: input.settlementAccountId,
-      statement_closing_day: input.statementClosingDay,
+      statement_closing_day: CREDIT_CARD_MONTH_END_DAY,
       payment_day: input.paymentDay,
       automatic_settlement: input.automaticSettlement
     },

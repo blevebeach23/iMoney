@@ -115,7 +115,7 @@ describe("credit card service", () => {
       automaticSettlement: true
     });
 
-    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ account_id: "card-1", settlement_account_id: "bank-1" }), { onConflict: "account_id" });
+    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ account_id: "card-1", settlement_account_id: "bank-1", statement_closing_day: 31, payment_day: 5 }), { onConflict: "account_id" });
   });
 
   it("rejects cross-user or wrong-type settlement references before upsert", async () => {

@@ -93,7 +93,7 @@ export async function saveCreditCardSettingsAction(_prevState: FormState, formDa
   const parsed = creditCardSettingsFormSchema.safeParse({
     accountId: String(formData.get("accountId") ?? ""),
     settlementAccountId: String(formData.get("settlementAccountId") ?? ""),
-    statementClosingDay: String(formData.get("statementClosingDay") ?? "1"),
+    statementClosingDay: String(formData.get("statementClosingDay") ?? "31"),
     paymentDay: String(formData.get("paymentDay") ?? "1"),
     automaticSettlement: formData.get("automaticSettlement") === "on" || formData.get("automaticSettlement") === "true"
   });
